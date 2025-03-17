@@ -1,41 +1,44 @@
-import { z } from "zod"
-import { router } from "@/lib/trpc/server"
-import { withSupabase } from "../middleware"
+import { z } from "zod";
+import { router, publicProcedure } from "@/lib/trpc/server";
+import { protectedProcedure } from "../middleware";
 
 export const tasksRouter = router({
-  getAll: withSupabase.query(async ({ ctx }) => {
+  getAll: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const { data: tasks, error } = await ctx.supabase.from("tasks").select("*").order("position")
+      const { data: tasks, error } = await ctx.supabase
+        .from("tasks")
+        .select("*")
+        .order("position");
 
-      if (error) throw error
-      return tasks || []
+      if (error) throw error;
+      return tasks || [];
     } catch (error) {
-      console.error("Error fetching tasks:", error)
-      return []
+      console.error("Error fetching tasks:", error);
+      return [];
     }
   }),
 
-  create: withSupabase
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1),
         parentId: z.string().uuid().nullable(),
         position: z.number().optional(),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         // If position is not provided, get the max position for the parent and add 1
-        let position = input.position
+        let position = input.position;
         if (position === undefined) {
           const { data } = await ctx.supabase
             .from("tasks")
             .select("position")
             .eq("parent_id", input.parentId)
             .order("position", { ascending: false })
-            .limit(1)
+            .limit(1);
 
-          position = data && data.length > 0 ? data[0].position + 1 : 0
+          position = data && data.length > 0 ? data[0].position + 1 : 0;
         }
 
         const { data, error } = await ctx.supabase
@@ -46,24 +49,24 @@ export const tasksRouter = router({
             position,
           })
           .select()
-          .single()
+          .single();
 
-        if (error) throw error
-        return data
+        if (error) throw error;
+        return data;
       } catch (error) {
-        console.error("Error creating task:", error)
-        throw error
+        console.error("Error creating task:", error);
+        throw error;
       }
     }),
 
-  update: withSupabase
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid(),
         title: z.string().min(1).optional(),
         parentId: z.string().uuid().nullable().optional(),
         position: z.number().optional(),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       try {
@@ -76,47 +79,49 @@ export const tasksRouter = router({
           })
           .eq("id", input.id)
           .select()
-          .single()
+          .single();
 
-        if (error) throw error
-        return data
+        if (error) throw error;
+        return data;
       } catch (error) {
-        console.error("Error updating task:", error)
-        throw error
+        console.error("Error updating task:", error);
+        throw error;
       }
     }),
 
-  delete: withSupabase
+  delete: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid(),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       try {
         // First, recursively delete all child tasks
         const deleteTaskAndChildren = async (taskId: string) => {
           // Get all children
-          const { data: children } = await ctx.supabase.from("tasks").select("id").eq("parent_id", taskId)
+          const { data: children } = await ctx.supabase
+            .from("tasks")
+            .select("id")
+            .eq("parent_id", taskId);
 
           // Recursively delete children
           if (children && children.length > 0) {
             for (const child of children) {
-              await deleteTaskAndChildren(child.id)
+              await deleteTaskAndChildren(child.id);
             }
           }
 
           // Delete the task
-          await ctx.supabase.from("tasks").delete().eq("id", taskId)
-        }
+          await ctx.supabase.from("tasks").delete().eq("id", taskId);
+        };
 
-        await deleteTaskAndChildren(input.id)
+        await deleteTaskAndChildren(input.id);
 
-        return { success: true }
+        return { success: true };
       } catch (error) {
-        console.error("Error deleting task:", error)
-        throw error
+        console.error("Error deleting task:", error);
+        throw error;
       }
     }),
-})
-
+});

@@ -1,27 +1,30 @@
-import { z } from "zod"
-import { router } from "@/lib/trpc/server"
-import { withSupabase } from "../middleware"
+import { z } from "zod";
+import { router } from "@/lib/trpc/server";
+import { protectedProcedure } from "../middleware";
 
 export const usersRouter = router({
-  getAll: withSupabase.query(async ({ ctx }) => {
+  getAll: protectedProcedure.query(async ({ ctx }) => {
     try {
-      const { data: users, error } = await ctx.supabase.from("users").select("*").order("name")
+      const { data: users, error } = await ctx.supabase
+        .from("users")
+        .select("*")
+        .order("name");
 
-      if (error) throw error
-      return users || []
+      if (error) throw error;
+      return users || [];
     } catch (error) {
-      console.error("Error fetching users:", error)
-      return []
+      console.error("Error fetching users:", error);
+      return [];
     }
   }),
 
-  getOrCreate: withSupabase
+  getOrCreate: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1),
         email: z.string().email().optional(),
         avatarUrl: z.string().url().optional(),
-      }),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       try {
@@ -31,9 +34,9 @@ export const usersRouter = router({
             .from("users")
             .select("*")
             .eq("email", input.email)
-            .maybeSingle()
+            .maybeSingle();
 
-          if (existingUser) return existingUser
+          if (existingUser) return existingUser;
         }
 
         // Otherwise create a new user
@@ -45,14 +48,13 @@ export const usersRouter = router({
             avatar_url: input.avatarUrl || null,
           })
           .select()
-          .single()
+          .single();
 
-        if (error) throw error
-        return data
+        if (error) throw error;
+        return data;
       } catch (error) {
-        console.error("Error creating user:", error)
-        throw error
+        console.error("Error creating user:", error);
+        throw error;
       }
     }),
-})
-
+});
