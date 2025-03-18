@@ -1,201 +1,179 @@
 import { z } from "zod";
-import { router } from "@/lib/trpc/server";
+import { router, publicProcedure } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
+import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/prisma";
+import type { Context } from "@/lib/trpc/server";
+
+// Define input schemas
+const getByDateSchema = z.object({
+  taskId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const toggleSchema = z.object({
+  taskId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+type GetByDateInput = z.infer<typeof getByDateSchema>;
+type ToggleInput = z.infer<typeof toggleSchema>;
 
 export const completionsRouter = router({
   getByDate: protectedProcedure
-    .input(
-      z.object({
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-      })
-    )
-    .query(async ({ ctx, input }) => {
+    .input(getByDateSchema)
+    .query(async ({ ctx, input }: { ctx: Context; input: GetByDateInput }) => {
       try {
-        const { data: completions, error } = await ctx.supabase
-          .from("completions")
-          .select("*")
-          .eq("completed_date", input.date);
+        // First verify the user has access to this task
+        const task = await prisma.task.findFirst({
+          where: {
+            id: input.taskId,
+            deletedAt: null,
+          },
+          include: {
+            team: {
+              include: {
+                members: {
+                  where: {
+                    userId: ctx.userId!,
+                  },
+                },
+              },
+            },
+          },
+        });
 
-        if (error) throw error;
-        return completions || [];
+        if (!task) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
+        }
+
+        if (!task.team?.members.length) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this task",
+          });
+        }
+
+        // Get completion status
+        const completion = await prisma.taskCompletion.findUnique({
+          where: {
+            taskId_userId_completionDate: {
+              taskId: input.taskId,
+              userId: ctx.userId!,
+              completionDate: input.date,
+            },
+          },
+        });
+
+        return {
+          completed: !!completion,
+          completionDetails: completion,
+        };
       } catch (error) {
-        console.error("Error fetching completions:", error);
-        return [];
+        console.error("Error fetching completion status:", error);
+        if (error instanceof TRPCError) throw error;
+        return { completed: false, completionDetails: null };
       }
     }),
 
   toggle: protectedProcedure
-    .input(
-      z.object({
-        taskId: z.string().uuid(),
-        userId: z.string().uuid(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-        completed: z.boolean(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
+    .input(toggleSchema)
+    .mutation(async ({ ctx, input }: { ctx: Context; input: ToggleInput }) => {
       try {
-        // First get the task to find its team_id
-        const { data: task, error: taskError } = await ctx.supabase
-          .from("tasks")
-          .select("team_id")
-          .eq("id", input.taskId)
-          .single();
+        // First verify the user has access to this task
+        const task = await prisma.task.findFirst({
+          where: {
+            id: input.taskId,
+            deletedAt: null,
+          },
+          include: {
+            team: {
+              include: {
+                members: {
+                  where: {
+                    userId: ctx.userId!,
+                  },
+                },
+              },
+            },
+          },
+        });
 
-        if (taskError) throw taskError;
-
-        // Check if the user has checked in for today
-        const { data: checkIn, error: checkInError } = await ctx.supabase
-          .from("check_ins")
-          .select("*")
-          .eq("team_id", task.team_id)
-          .eq("user_id", input.userId)
-          .eq("check_in_date", input.date)
-          .single();
-
-        if (checkInError && checkInError.code !== "PGRST116")
-          throw checkInError;
-
-        if (!checkIn && input.completed) {
-          throw new Error("You must check in before completing tasks");
+        if (!task) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
         }
 
-        // Continue with the existing task completion logic
-        if (input.completed) {
-          // Check if this is a parent task
-          const { data: childTasks, error: childTasksError } =
-            await ctx.supabase
-              .from("tasks")
-              .select("id")
-              .eq("parent_id", input.taskId);
+        if (!task.team?.members.length) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this task",
+          });
+        }
 
-          if (childTasksError) throw childTasksError;
+        // Check if the user has checked in for the day
+        const checkIn = await prisma.checkIn.findUnique({
+          where: {
+            teamId_userId_checkInDate: {
+              teamId: task.team.id,
+              userId: ctx.userId!,
+              checkInDate: input.date,
+            },
+          },
+        });
 
-          if (childTasks && childTasks.length > 0) {
-            // For a parent task, we need to make sure all child tasks are completed
-            const childTaskIds = childTasks.map(
-              (child: { id: string }) => child.id
-            );
+        if (!checkIn) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You must check in before completing tasks",
+          });
+        }
 
-            const { data: childCompletions, error: childCompletionsError } =
-              await ctx.supabase
-                .from("completions")
-                .select("task_id")
-                .in("task_id", childTaskIds)
-                .eq("completed_date", input.date);
+        // Get existing completion
+        const existingCompletion = await prisma.taskCompletion.findUnique({
+          where: {
+            taskId_userId_completionDate: {
+              taskId: input.taskId,
+              userId: ctx.userId!,
+              completionDate: input.date,
+            },
+          },
+        });
 
-            if (childCompletionsError) throw childCompletionsError;
+        if (existingCompletion) {
+          // Delete the completion
+          await prisma.taskCompletion.delete({
+            where: {
+              id: existingCompletion.id,
+            },
+          });
 
-            const completedChildTaskIds =
-              childCompletions?.map((c: { task_id: string }) => c.task_id) ||
-              [];
-            const allChildrenComplete = childTaskIds.every((id: string) =>
-              completedChildTaskIds.includes(id)
-            );
-
-            if (!allChildrenComplete) {
-              throw new Error(
-                "Cannot complete parent task - not all subtasks are complete"
-              );
-            }
-          }
-
-          // Get all users from the database
-          const { data: users, error: usersError } = await ctx.supabase
-            .from("users")
-            .select("id");
-
-          if (usersError) throw usersError;
-
-          // Add completion for all users, marking the original user as the completer
-          const completions = (users || []).map((user: { id: string }) => ({
-            task_id: input.taskId,
-            user_id: user.id,
-            completed_date: input.date,
-            completed_by: input.userId, // Track who completed it
-          }));
-
-          const { data, error } = await ctx.supabase
-            .from("completions")
-            .insert(completions)
-            .select();
-
-          if (error && error.code !== "23505") throw error; // Ignore unique violation errors
-
-          // If this is a subtask, check if all siblings are now complete to possibly complete the parent
-          if (task.parent_id) {
-            // Get all sibling tasks (tasks with the same parent)
-            const { data: siblingTasks, error: siblingTasksError } =
-              await ctx.supabase
-                .from("tasks")
-                .select("id")
-                .eq("parent_id", task.parent_id);
-
-            if (siblingTasksError) throw siblingTasksError;
-
-            if (siblingTasks && siblingTasks.length > 0) {
-              const siblingTaskIds = siblingTasks.map(
-                (sibling: { id: string }) => sibling.id
-              );
-
-              // Get completions for all siblings
-              const {
-                data: siblingCompletions,
-                error: siblingCompletionsError,
-              } = await ctx.supabase
-                .from("completions")
-                .select("task_id")
-                .in("task_id", siblingTaskIds)
-                .eq("completed_date", input.date);
-
-              if (siblingCompletionsError) throw siblingCompletionsError;
-
-              const completedSiblingTaskIds =
-                siblingCompletions?.map(
-                  (c: { task_id: string }) => c.task_id
-                ) || [];
-              const allSiblingsComplete = siblingTaskIds.every((id: string) =>
-                completedSiblingTaskIds.includes(id)
-              );
-
-              // If all siblings are complete, mark parent as complete too
-              if (allSiblingsComplete) {
-                // Get all users again for parent task completion
-                const userCompletions = (users || []).map(
-                  (user: { id: string }) => ({
-                    task_id: task.parent_id,
-                    user_id: user.id,
-                    completed_date: input.date,
-                    completed_by: input.userId, // Same user completes the parent
-                  })
-                );
-
-                await ctx.supabase.from("completions").insert(userCompletions);
-              }
-            }
-          }
-
-          return data;
+          return {
+            success: true,
+            message: "Task marked as incomplete",
+            completed: false,
+          };
         } else {
-          // Remove completion for all users
-          const { error } = await ctx.supabase
-            .from("completions")
-            .delete()
-            .eq("task_id", input.taskId)
-            .eq("completed_date", input.date);
+          // Create the completion
+          const completion = await prisma.taskCompletion.create({
+            data: {
+              taskId: input.taskId,
+              userId: ctx.userId!,
+              completionDate: input.date,
+            },
+          });
 
-          if (error) throw error;
-
-          // If a child task is being unchecked, also uncheck the parent
-          if (task.parent_id) {
-            await ctx.supabase
-              .from("completions")
-              .delete()
-              .eq("task_id", task.parent_id)
-              .eq("completed_date", input.date);
-          }
-
-          return null;
+          return {
+            success: true,
+            message: "Task marked as complete",
+            completed: true,
+            completion,
+          };
         }
       } catch (error) {
         console.error("Error toggling completion:", error);

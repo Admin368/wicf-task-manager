@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Team {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String       @db.VarChar(255)
+  slug      String       @unique @db.VarChar(100)
+  password  String       @db.VarChar(255)
+  createdAt DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
+  isDeleted Boolean      @default(false) @map("is_deleted")
+  checkIns  CheckIn[]
+  tasks     Task[]
+  members   TeamMember[]
+
+  @@index([slug], map: "idx_teams_slug")
+  @@map("teams")
+}
+
+model User {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  email       String?      @unique
+  avatarUrl   String?      @map("avatar_url")
+  createdAt   DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
+  checkIns    CheckIn[]
+  completions TaskCompletion[]
+  teamMembers TeamMember[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  parentId    String?      @map("parent_id") @db.Uuid
+  position    Int          @default(0)
+  createdAt   DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
+  teamId      String?      @map("team_id") @db.Uuid
+  isDeleted   Boolean      @default(false) @map("is_deleted")
+  completions TaskCompletion[]
+  parent      Task?        @relation("TaskToTask", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    Task[]       @relation("TaskToTask")
+  team        Team?        @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([parentId], map: "idx_tasks_parent")
+  @@index([parentId], map: "idx_tasks_parent_id")
+  @@index([position], map: "idx_tasks_position")
+  @@index([teamId], map: "idx_tasks_team")
+  @@map("tasks")
+}
+
+model TeamMember {
+  teamId    String    @map("team_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      String?   @default("member") @db.VarChar(50)
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([teamId, userId])
+  @@map("team_members")
+}
+
+model CheckIn {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId      String   @map("team_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  checkInDate DateTime @map("check_in_date") @db.Date
+  checkedInAt DateTime @default(now()) @map("checked_in_at") @db.Timestamptz(6)
+  notes       String?
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([teamId, userId, checkInDate])
+  @@index([teamId, checkInDate], map: "idx_check_ins_team_date")
+  @@index([userId], map: "idx_check_ins_user")
+  @@map("check_ins")
+}
+
+model TaskCompletion {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId        String    @map("task_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  completionDate DateTime  @map("completion_date") @db.Date
+  completedAt   DateTime? @default(now()) @map("completed_at") @db.Timestamptz(6)
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([taskId, userId, completionDate], map: "idx_unique_completion")
+  @@index([taskId], map: "idx_completions_task_id")
+  @@index([userId, completionDate], map: "idx_completions_user_date")
+  @@map("task_completions")
+}

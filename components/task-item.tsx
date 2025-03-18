@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { useUser } from "./user-provider";
-import { getClientSupabaseClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { TaskCompletionModal } from "./task-completion-modal";
@@ -25,7 +24,7 @@ interface TaskItemProps {
   task: {
     id: string;
     title: string;
-    parent_id: string | null;
+    parentId: string | null;
     position: number;
   };
   tasks: any[];
@@ -60,7 +59,6 @@ export function TaskItem({
   const [expanded, setExpanded] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [completedBy, setCompletedBy] = useState<string | null>(null);
-  const [supabaseError, setSupabaseError] = useState<string | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [pendingCompletion, setPendingCompletion] = useState<boolean | null>(
     null
@@ -74,7 +72,7 @@ export function TaskItem({
   );
 
   const toggleCompletion = api.completions.toggle.useMutation({
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Failed to toggle completion:", error);
       toast({
         title: "Error",
@@ -89,16 +87,14 @@ export function TaskItem({
     },
   });
 
-  // const utils = api.useContext()
-
   // Get child tasks
   const childTasks = tasks
-    .filter((t) => t.parent_id === task.id)
+    .filter((t) => t.parentId === task.id)
     .sort((a, b) => a.position - b.position);
 
   // Get sibling tasks (tasks at the same level)
   const siblingTasks = tasks
-    .filter((t) => t.parent_id === task.parent_id)
+    .filter((t) => t.parentId === task.parentId)
     .sort((a, b) => a.position - b.position);
 
   const currentIndex = siblingTasks.findIndex((t) => t.id === task.id);
@@ -110,58 +106,12 @@ export function TaskItem({
     if (!userId) return;
 
     const completion = completions.find(
-      (c) => c.task_id === task.id && c.completed_date === selectedDate
+      (c) => c.taskId === task.id && c.completedDate === selectedDate
     );
 
     setIsCompleted(!!completion);
-    setCompletedBy(completion?.completed_by || null);
+    setCompletedBy(completion?.completedById || null);
   }, [completions, task.id, userId, selectedDate]);
-
-  // Subscribe to real-time updates
-  useEffect(() => {
-    let channel: any = null;
-
-    try {
-      const supabase = getClientSupabaseClient();
-
-      channel = supabase
-        .channel("completions-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "completions",
-            // filter: `task_id=eq.${task.id}`,
-          },
-          () => {
-            // Refetch completions when changes occur
-            // utils.completions.getByDate.invalidate({ date: selectedDate })
-            console.log("refetching completions");
-            refetchCompletions?.();
-          }
-        )
-        .subscribe((status: any) => {
-          if (status === "SUBSCRIPTION_ERROR") {
-            setSupabaseError("Failed to subscribe to real-time updates");
-          }
-        });
-    } catch (error) {
-      console.error("Error setting up real-time subscription:", error);
-      setSupabaseError("Failed to set up real-time updates");
-    }
-
-    return () => {
-      if (channel) {
-        try {
-          const supabase = getClientSupabaseClient();
-          supabase.removeChannel(channel);
-        } catch (error) {
-          console.error("Error removing channel:", error);
-        }
-      }
-    };
-  }, [task.id, selectedDate, refetchCompletions]);
 
   const handleCheckboxChange = async (checked: boolean | "indeterminate") => {
     if (!userId || typeof checked !== "boolean") return;
@@ -185,8 +135,6 @@ export function TaskItem({
       });
 
       // Refetch to ensure data consistency
-      // utils.completions.getByDate.invalidate({ date: selectedDate })
-      // console.log("refetching completions")
       refetchCompletions?.();
     } catch (error) {
       console.error("Failed to toggle completion:", error);
@@ -248,121 +196,85 @@ export function TaskItem({
             ) : (
               <div className="w-5" />
             )}
-
             <Checkbox
               checked={isCompleted}
               onCheckedChange={handleCheckboxChange}
-              id={`task-${task.id}`}
-              className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+              className="data-[state=checked]:bg-green-600"
             />
+            <span className="flex-1">{task.title}</span>
+            {completedBy && (
+              <span className="text-sm text-muted-foreground">
+                Completed by{" "}
+                {teamMembers.find((m) => m.id === completedBy)?.name}
+              </span>
+            )}
+          </div>
 
-            <label
-              htmlFor={`task-${task.id}`}
-              className={cn(
-                "flex-grow text-sm cursor-pointer",
-                isCompleted && "line-through text-muted-foreground"
-              )}
+          <div className="flex items-center gap-1">
+            {!isFirst && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onMoveTask?.(task.id, "up")}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+            )}
+            {!isLast && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onMoveTask?.(task.id, "down")}
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onAddSubtask?.(task.id)}
             >
-              {task.title}
-            </label>
-
-            {isCompleted && completedBy && (
-              <div className="text-xs text-muted-foreground">
-                Task completed by{" "}
-                {completedBy === userId
-                  ? "you"
-                  : teamMembers?.find((member) => member.id === completedBy)
-                      ?.name}
-              </div>
-            )}
-
-            {supabaseError && (
-              <div className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                <span>Sync error</span>
-              </div>
-            )}
-
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onEditTask?.(task)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             {isAdmin && (
-              <div className="flex items-center gap-1">
-                {onAddSubtask && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onAddSubtask(task.id)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                )}
-
-                {onEditTask && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onEditTask(task)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-
-                {onDeleteTask && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
-                    onClick={() => onDeleteTask(task.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-
-                {onMoveTask && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-8 w-8 shrink-0",
-                        isFirst && "opacity-50"
-                      )}
-                      disabled={isFirst}
-                      onClick={() => onMoveTask(task.id, "up")}
-                    >
-                      <ArrowUp className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn("h-8 w-8 shrink-0", isLast && "opacity-50")}
-                      disabled={isLast}
-                      onClick={() => onMoveTask(task.id, "down")}
-                    >
-                      <ArrowDown className="h-5 w-5" />
-                    </Button>
-                  </>
-                )}
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onDeleteTask?.(task.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
           </div>
         </div>
 
         {expanded && childTasks.length > 0 && (
-          <div className="ml-4">
+          <div>
             {childTasks.map((childTask) => (
               <TaskItem
                 key={childTask.id}
                 task={childTask}
                 tasks={tasks}
                 completions={completions}
+                teamMembers={teamMembers}
                 selectedDate={selectedDate}
                 level={level + 1}
                 onAddSubtask={onAddSubtask}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
                 onMoveTask={onMoveTask}
-                teamMembers={teamMembers}
                 refetchCompletions={refetchCompletions}
               />
             ))}

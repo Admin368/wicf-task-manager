@@ -1,16 +1,39 @@
 import { z } from "zod";
 import { router, publicProcedure } from "@/lib/trpc/server";
-import { protectedProcedure, withSupabase } from "../middleware";
+import { protectedProcedure } from "../middleware";
 import { slugify } from "@/lib/utils";
+import { prisma } from "@/lib/prisma";
+import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
+import type { Context } from "@/lib/trpc/server";
+
+type TeamInput = {
+  name: string;
+  password: string;
+};
+
+type JoinInput = {
+  teamId: string;
+  password: string;
+};
+
+type TeamIdInput = {
+  teamId: string;
+};
 
 export const teamsRouter = router({
-  getAll: publicProcedure.use(withSupabase).query(async ({ ctx }) => {
+  getAll: publicProcedure.query(async ({ ctx }) => {
     try {
-      const { data: teams, error } = await ctx.supabase
-        .from("teams")
-        .select("id, name, slug, created_at");
-
-      if (error) throw error;
+      const teams = await ctx.prisma.team.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          createdAt: true,
+        },
+        where: {
+          isDeleted: false,
+        },
+      });
       return teams || [];
     } catch (error) {
       console.error("Error fetching teams:", error);
@@ -19,7 +42,6 @@ export const teamsRouter = router({
   }),
 
   getBySlug: publicProcedure
-    .use(withSupabase)
     .input(
       z.object({
         slug: z.string(),
@@ -27,17 +49,16 @@ export const teamsRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        const { data: team, error } = await ctx.supabase
-          .from("teams")
-          .select("id, name, slug, created_at, password")
-          .eq("slug", input.slug)
-          .single();
-
-        if (error) throw error;
+        const team = await ctx.prisma.team.findFirst({
+          where: {
+            slug: input.slug,
+            isDeleted: false,
+          },
+        });
         return team;
       } catch (error) {
         console.error("Error fetching team:", error);
-        return null;
+        throw error;
       }
     }),
 
@@ -48,43 +69,46 @@ export const teamsRouter = router({
         password: z.string().min(4),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }: { ctx: Context; input: TeamInput }) => {
       try {
+        if (!ctx.userId) throw new Error("User ID is required");
+        const userId = ctx.userId; // Create a non-nullable reference
+
         // Generate slug from name
         let slug = slugify(input.name);
 
         // Check if slug already exists
-        const { data: existingTeam } = await ctx.supabase
-          .from("teams")
-          .select("id")
-          .eq("slug", slug)
-          .single();
+        const existingTeam = await ctx.prisma.team.findUnique({
+          where: { slug },
+        });
 
         // If slug exists, append a random number
         if (existingTeam) {
           slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
         }
 
-        const { data, error } = await ctx.supabase
-          .from("teams")
-          .insert({
-            name: input.name,
-            slug,
-            password: input.password, // In a real app, you'd hash this
-          })
-          .select()
-          .single();
+        // Create team and add creator as admin in a transaction
+        const team = await ctx.prisma.$transaction(async (tx) => {
+          const newTeam = await tx.team.create({
+            data: {
+              name: input.name,
+              slug,
+              password: input.password, // In a real app, you'd hash this
+            },
+          });
 
-        if (error) throw error;
+          await tx.teamMember.create({
+            data: {
+              teamId: newTeam.id,
+              userId,
+              role: "admin",
+            },
+          });
 
-        // Add the creator as a team member with 'admin' role
-        await ctx.supabase.from("team_members").insert({
-          team_id: data.id,
-          user_id: ctx.userId,
-          role: "admin",
+          return newTeam;
         });
 
-        return data;
+        return team;
       } catch (error) {
         console.error("Error creating team:", error);
         throw error;
@@ -98,39 +122,40 @@ export const teamsRouter = router({
         password: z.string(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }: { ctx: Context; input: JoinInput }) => {
       try {
-        // Verify password
-        const { data: team, error: teamError } = await ctx.supabase
-          .from("teams")
-          .select("password")
-          .eq("id", input.teamId)
-          .single();
+        if (!ctx.userId) throw new Error("User ID is required");
+        const userId = ctx.userId; // Create a non-nullable reference
 
-        if (teamError) throw teamError;
-        if (team.password !== input.password) {
+        // Verify password
+        const team = await ctx.prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { password: true },
+        });
+
+        if (!team || team.password !== input.password) {
           throw new Error("Incorrect password");
         }
 
         // Check if user is already a member
-        const { data: existingMembership } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        const existingMembership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId,
+            },
+          },
+        });
 
         // If not already a member, add them
         if (!existingMembership) {
-          const { error: memberError } = await ctx.supabase
-            .from("team_members")
-            .insert({
-              team_id: input.teamId,
-              user_id: ctx.userId,
+          await ctx.prisma.teamMember.create({
+            data: {
+              teamId: input.teamId,
+              userId,
               role: "member",
-            });
-
-          if (memberError) throw memberError;
+            },
+          });
         }
 
         return { success: true };
@@ -146,17 +171,20 @@ export const teamsRouter = router({
         teamId: z.string().uuid(),
       })
     )
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx, input }: { ctx: Context; input: TeamIdInput }) => {
       try {
-        const { data, error } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        if (!ctx.userId) throw new Error("User ID is required");
+        const userId = ctx.userId; // Create a non-nullable reference
 
-        if (error) return { hasAccess: false };
-        return { hasAccess: !!data };
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId,
+            },
+          },
+        });
+        return { hasAccess: !!membership };
       } catch (error) {
         console.error("Error verifying team access:", error);
         return { hasAccess: false };
@@ -171,15 +199,20 @@ export const teamsRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // First verify the current user is an admin
-        const { data: currentUserRole, error: roleError } = await ctx.supabase
-          .from("team_members")
-          .select("role")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        if (!ctx.userId) throw new Error("User ID is required");
+        const userId = ctx.userId;
 
-        if (roleError) throw new Error("Failed to verify user role");
+        // First verify the current user is an admin
+        const currentUserRole = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId,
+            },
+          },
+          select: { role: true },
+        });
+
         if (
           !currentUserRole ||
           !["admin", "owner"].includes(currentUserRole.role)
@@ -187,13 +220,17 @@ export const teamsRouter = router({
           throw new Error("You don't have permission to delete this team");
         }
 
-        // Delete all team-related data in a transaction
-        console.log("Deleting team:", input.teamId);
-        const { error } = await ctx.supabase.rpc("delete_team", {
-          team_id: input.teamId,
-        });
-
-        if (error) throw error;
+        // Soft delete the team and its tasks in a transaction
+        await ctx.prisma.$transaction([
+          ctx.prisma.team.update({
+            where: { id: input.teamId },
+            data: { isDeleted: true },
+          }),
+          ctx.prisma.task.updateMany({
+            where: { teamId: input.teamId },
+            data: { isDeleted: true },
+          }),
+        ]);
 
         return { success: true };
       } catch (error) {
@@ -202,3 +239,7 @@ export const teamsRouter = router({
       }
     }),
 });
+
+export type TeamsRouter = typeof teamsRouter;
+export type TeamsInput = inferRouterInputs<TeamsRouter>;
+export type TeamsOutput = inferRouterOutputs<TeamsRouter>;

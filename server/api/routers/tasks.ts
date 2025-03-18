@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { router, publicProcedure } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
+import { TRPCError } from "@trpc/server";
+import { Prisma } from "@prisma/client";
 
 export const tasksRouter = router({
-  getByTeam: protectedProcedure
+  getByTeam: publicProcedure
     .input(
       z.object({
         teamId: z.string().uuid(),
@@ -11,65 +13,78 @@ export const tasksRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        // First verify the user has access to this team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single()
-          .order("created_at",  { ascending: false });
-
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in",
+          });
         }
 
-        const { data: tasks, error } = await ctx.supabase
-          .from("tasks")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .order("position");
+        // First verify the user has access to this team
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
 
-        if (error) throw error;
-        return tasks || [];
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
+        }
+
+        const tasks = await ctx.prisma.$queryRaw`
+          SELECT * FROM tasks 
+          WHERE team_id = ${input.teamId}
+          AND is_deleted = false 
+          ORDER BY position ASC
+        `;
+
+        return tasks;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Error fetching team tasks:", error);
         return [];
       }
     }),
 
-  getAll: protectedProcedure.query(async ({ ctx }) => {
+  getAll: publicProcedure.query(async ({ ctx }) => {
     try {
-      // Get user's teams
-      const { data: memberships, error: membershipError } = await ctx.supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", ctx.userId);
-      
-      if (membershipError) throw membershipError;
-      
-      // If user is not in any teams, return empty array
-      if (!memberships || memberships.length === 0) {
+      if (!ctx.userId) {
         return [];
       }
-      
-      const teamIds = memberships.map((m: { team_id: string }) => m.team_id);
-      
-      const { data: tasks, error } = await ctx.supabase
-        .from("tasks")
-        .select("*")
-        .in("team_id", teamIds)
-        .order("position");
 
-      if (error) throw error;
-      return tasks || [];
+      // Get user's teams
+      const memberships = await ctx.prisma.teamMember.findMany({
+        where: { userId: ctx.userId },
+        select: { teamId: true },
+      });
+
+      if (memberships.length === 0) {
+        return [];
+      }
+
+      const teamIds = memberships.map((m) => m.teamId);
+
+      const tasks = await ctx.prisma.$queryRaw`
+        SELECT * FROM tasks 
+        WHERE team_id = ANY(${teamIds}::uuid[])
+        AND is_deleted = false 
+        ORDER BY position ASC
+      `;
+
+      return tasks;
     } catch (error) {
       console.error("Error fetching tasks:", error);
       return [];
     }
   }),
 
-  create: protectedProcedure
+  create: publicProcedure
     .input(
       z.object({
         title: z.string().min(1),
@@ -80,52 +95,63 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Verify user has access to the team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in",
+          });
+        }
 
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        // Verify user has access to the team
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
+
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
         }
 
         // If position is not provided, get the max position for the parent and add 1
         let position = input.position;
         if (position === undefined) {
-          const { data } = await ctx.supabase
-            .from("tasks")
-            .select("position")
-            .eq("parent_id", input.parentId)
-            .eq("team_id", input.teamId)
-            .order("position", { ascending: false })
-            .limit(1);
+          const lastTask = await ctx.prisma.$queryRaw<{ position: number }[]>`
+            SELECT position FROM tasks 
+            WHERE parent_id = ${input.parentId}
+            AND team_id = ${input.teamId}
+            AND is_deleted = false 
+            ORDER BY position DESC 
+            LIMIT 1
+          `;
 
-          position = data && data.length > 0 ? data[0].position + 1 : 0;
+          position = lastTask.length > 0 ? lastTask[0].position + 1 : 0;
         }
 
-        const { data, error } = await ctx.supabase
-          .from("tasks")
-          .insert({
+        const task = await ctx.prisma.task.create({
+          data: {
             title: input.title,
-            parent_id: input.parentId,
-            team_id: input.teamId,
+            parentId: input.parentId,
+            teamId: input.teamId,
             position,
-          })
-          .select()
-          .single();
+          },
+        });
 
-        if (error) throw error;
-        return data;
+        return task;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Error creating task:", error);
         throw error;
       }
     }),
 
-  update: protectedProcedure
+  update: publicProcedure
     .input(
       z.object({
         id: z.string().uuid().optional(),
@@ -133,98 +159,127 @@ export const tasksRouter = router({
         parentId: z.string().uuid().nullable().optional(),
         teamId: z.string().uuid().optional(),
         position: z.number().optional(),
-        updates: z.array(
-          z.object({
-            id: z.string().uuid(),
-            position: z.number(),
-          })
-        ).optional(),
+        updates: z
+          .array(
+            z.object({
+              id: z.string().uuid(),
+              position: z.number(),
+            })
+          )
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in",
+          });
+        }
+
         // If this is a batch update
         if (input.updates) {
           // Get the first task to check team access
-          const { data: task, error: taskError } = await ctx.supabase
-            .from("tasks")
-            .select("team_id")
-            .eq("id", input.updates[0].id)
-            .single();
-          
-          if (taskError) throw taskError;
-          
-          // Verify user has access to the team
-          const { data: membership, error: membershipError } = await ctx.supabase
-            .from("team_members")
-            .select("*")
-            .eq("team_id", task.team_id)
-            .eq("user_id", ctx.userId)
-            .single();
+          const firstTask = await ctx.prisma.task.findUnique({
+            where: { id: input.updates[0].id },
+            select: { teamId: true },
+          });
 
-          if (membershipError || !membership) {
-            throw new Error("You don't have access to this team");
+          if (!firstTask || !firstTask.teamId) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Task not found",
+            });
+          }
+
+          // Verify user has access to the team
+          const membership = await ctx.prisma.teamMember.findUnique({
+            where: {
+              teamId_userId: {
+                teamId: firstTask.teamId,
+                userId: ctx.userId,
+              },
+            },
+          });
+
+          if (!membership) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "You don't have access to this team",
+            });
           }
 
           // Update positions in a transaction
-          const { error } = await ctx.supabase.rpc('update_task_positions', {
-            position_updates: input.updates.map(update => ({
-              task_id: update.id,
-              new_position: update.position,
-            }))
-          });
+          await ctx.prisma.$transaction(
+            input.updates.map((update) =>
+              ctx.prisma.task.update({
+                where: { id: update.id },
+                data: { position: update.position },
+              })
+            )
+          );
 
-          if (error) throw error;
           return { success: true };
         }
 
         // Regular single task update
         if (!input.id) {
-          throw new Error("Task ID is required for single task update");
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Task ID is required for single task update",
+          });
         }
 
         // Get current task to check team
-        const { data: task, error: taskError } = await ctx.supabase
-          .from("tasks")
-          .select("team_id")
-          .eq("id", input.id)
-          .single();
-        
-        if (taskError) throw taskError;
-        
-        // Verify user has access to the team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", task.team_id)
-          .eq("user_id", ctx.userId)
-          .single();
+        const task = await ctx.prisma.task.findUnique({
+          where: { id: input.id },
+          select: { teamId: true },
+        });
 
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        if (!task || !task.teamId) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
         }
 
-        const { data, error } = await ctx.supabase
-          .from("tasks")
-          .update({
-            ...(input.title && { title: input.title }),
-            ...(input.parentId !== undefined && { parent_id: input.parentId }),
-            ...(input.teamId && { team_id: input.teamId }),
-            ...(input.position !== undefined && { position: input.position }),
-          })
-          .eq("id", input.id)
-          .select()
-          .single();
+        // Verify user has access to the team
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: task.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
 
-        if (error) throw error;
-        return data;
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
+        }
+
+        const updatedTask = await ctx.prisma.task.update({
+          where: { id: input.id },
+          data: {
+            ...(input.title && { title: input.title }),
+            ...(input.parentId !== undefined && { parentId: input.parentId }),
+            ...(input.teamId && { teamId: input.teamId }),
+            ...(input.position !== undefined && { position: input.position }),
+          },
+        });
+
+        return updatedTask;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Error updating task:", error);
         throw error;
       }
     }),
 
-  delete: protectedProcedure
+  delete: publicProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -232,93 +287,65 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in",
+          });
+        }
+
         // Get current task to check team
-        const { data: task, error: taskError } = await ctx.supabase
-          .from("tasks")
-          .select("team_id")
-          .eq("id", input.id)
-          .single();
-        
-        if (taskError) throw taskError;
-        
-        // Verify user has access to the team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", task.team_id)
-          .eq("user_id", ctx.userId)
-          .single();
-
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
-        }
-
-        // First, recursively delete all child tasks
-        const deleteTaskAndChildren = async (taskId: string) => {
-          // Get all children
-          const { data: children } = await ctx.supabase
-            .from("tasks")
-            .select("id")
-            .eq("parent_id", taskId);
-
-          // Recursively delete children
-          if (children && children.length > 0) {
-            for (const child of children) {
-              await deleteTaskAndChildren(child.id);
-            }
-          }
-
-          // Delete the task
-          await ctx.supabase.from("tasks").delete().eq("id", taskId);
-        };
-
-        await deleteTaskAndChildren(input.id);
-
-        return { success: true };
-      } catch (error) {
-        console.error("Error deleting task:", error);
-        throw error;
-      }
-    }),
-
-  updatePositions: protectedProcedure
-    .input(
-      z.object({
-        updates: z.array(
-          z.object({
-            id: z.string().uuid(),
-            position: z.number(),
-          })
-        ),
-        teamId: z.string().uuid(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        // Verify user has access to the team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
-
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
-        }
-
-        // Update positions in a transaction
-        const { error } = await ctx.supabase.rpc('update_task_positions', {
-          position_updates: input.updates.map(update => ({
-            task_id: update.id,
-            new_position: update.position,
-          }))
+        const task = await ctx.prisma.task.findUnique({
+          where: { id: input.id },
+          select: { teamId: true },
         });
 
-        if (error) throw error;
+        if (!task || !task.teamId) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
+        }
+
+        // Verify user has access to the team and is an admin
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: task.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
+
+        if (!membership || !["admin", "owner"].includes(membership.role)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to delete tasks",
+          });
+        }
+
+        const softDeleteTaskAndChildren = async (taskId: string) => {
+          const children = await ctx.prisma.task.findMany({
+            where: { parentId: taskId },
+          });
+
+          await ctx.prisma.$executeRaw`
+            UPDATE tasks 
+            SET is_deleted = true 
+            WHERE id = ${taskId}::uuid
+          `;
+
+          for (const child of children) {
+            await softDeleteTaskAndChildren(child.id);
+          }
+        };
+
+        await softDeleteTaskAndChildren(input.id);
+
         return { success: true };
       } catch (error) {
-        console.error("Error updating task positions:", error);
+        if (error instanceof TRPCError) throw error;
+        console.error("Error deleting task:", error);
         throw error;
       }
     }),
