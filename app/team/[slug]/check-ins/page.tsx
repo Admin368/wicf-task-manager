@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { format, parseISO, subDays } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, ChevronLeft, Loader2, Calendar as CalendarIcon } from "lucide-react"
+import { Calendar, ChevronLeft, Loader2, Calendar as CalendarIcon, Users } from "lucide-react"
 import { api } from "@/lib/trpc/client"
 import { DatePicker } from "@/components/date-picker"
 import { UserList } from "@/components/user-list"
@@ -120,131 +120,79 @@ export default function CheckInsPage() {
   }
   
   return (
-    <div className="container mx-auto py-6 max-w-5xl">
-      <div className="mb-6">
-        <Button variant="ghost" onClick={goBack} className="mb-4">
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back to Team
+    <div className="container py-8">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold">Daily Check-ins</h1>
+        <Button
+          variant="outline"
+          onClick={() => router.push(`/team/${slug}/check-ins/history`)}
+          className="flex items-center gap-2"
+        >
+          <Calendar className="h-4 w-4" />
+          View History
         </Button>
-        <h1 className="text-2xl font-bold">{team.name} Check-ins</h1>
-        <p className="text-muted-foreground">View and manage daily team attendance</p>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-6">
-          <CheckInButton teamId={team.id} />
-          <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                <span>Select Date</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DatePicker date={selectedDate} onDateChange={setSelectedDate} />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                <span>Recent Check-in Days</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2">
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : !history || history.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No check-in history available.</p>
-                </div>
-              ) : (
-                <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                  {history.slice(0, 20).map((day: HistoryItem) => (
-                    <div 
-                      key={day.check_in_date} 
-                      className={cn(
-                        "flex items-center justify-between p-2 rounded cursor-pointer",
-                        formattedDate === day.check_in_date ? "bg-primary/10" : "hover:bg-muted"
-                      )}
-                      onClick={() => setSelectedDate(parseISO(day.check_in_date))}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className={cn(
-                            "w-2 h-2 rounded-full",
-                            Number(day.check_in_count) > 0 ? "bg-green-500" : "bg-red-500"
-                          )}
-                        />
-                        <span>{format(parseISO(day.check_in_date), "EEE, MMM d")}</span>
-                      </div>
-                      <span className="font-medium">
-                        {day.check_in_count} {Number(day.check_in_count) === 1 ? "member" : "members"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+
+      <div className="space-y-6">
+        <CheckInButton teamId={team.id} />
+        <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
         
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" />
-                  <span>Check-ins for {format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                </div>
-                <div className="text-sm font-normal text-muted-foreground">
-                  {checkedInCount} of {totalMembers} members
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {checkInsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : checkIns && checkIns.length > 0 ? (
-                <UserList 
-                  teamMembers={checkIns.map((c: CheckIn) => ({ 
-                    id: c.userId,
-                    name: c.user.name || 'Unknown',
-                    email: c.user.email,
-                    avatar_url: c.user.avatar_url,
-                    role: 'member',
-                    notes: c.notes,
-                    checkedInAt: c.checkedInAt
-                  }))} 
-                  onClose={() => {}} 
-                  showTime
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                  <Calendar className="h-12 w-12 mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-medium mb-1">No Check-ins</h3>
-                  <p className="max-w-sm mb-6">No team members have checked in for this date yet.</p>
-                  
-                  {format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") && (
-                    <Button 
-                      variant="outline"
-                      onClick={() => document.getElementById('check-in-button')?.click()}
-                    >
-                      Check In Now
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              <span>Select Date</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DatePicker date={selectedDate} onDateChange={setSelectedDate} />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              <span>Check-ins for {format(selectedDate, "MMMM d, yyyy")}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {checkInsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : checkIns && checkIns.length > 0 ? (
+              <UserList 
+                teamMembers={checkIns.map((c: CheckIn) => ({ 
+                  id: c.userId,
+                  name: c.user.name || 'Unknown',
+                  email: c.user.email,
+                  avatar_url: c.user.avatar_url,
+                  role: 'member',
+                  notes: c.notes,
+                  checkedInAt: c.checkedInAt
+                }))} 
+                onClose={() => {}} 
+                showTime
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                <Calendar className="h-12 w-12 mb-4 text-muted-foreground/50" />
+                <h3 className="text-lg font-medium mb-1">No Check-ins</h3>
+                <p className="max-w-sm mb-6">No team members have checked in for this date yet.</p>
+                
+                {format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") && (
+                  <Button 
+                    variant="outline"
+                    onClick={() => document.getElementById('check-in-button')?.click()}
+                  >
+                    Check In Now
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -27,7 +27,8 @@ export const checkInsRouter = router({
         // Get check-ins with user details
         const { data, error } = await ctx.supabase
           .from("check_ins")
-          .select(`
+          .select(
+            `
             id,
             user_id,
             check_in_date,
@@ -39,13 +40,14 @@ export const checkInsRouter = router({
               email,
               avatar_url
             )
-          `)
+          `
+          )
           .eq("team_id", input.teamId)
           .eq("check_in_date", input.date)
           .order("checked_in_at");
 
         if (error) throw error;
-        
+
         // Transform the data to a more usable format
         const checkIns = data.map((checkIn: any) => ({
           id: checkIn.id,
@@ -86,26 +88,33 @@ export const checkInsRouter = router({
 
         // Get daily check-in counts for the past X days
         const { data, error } = await ctx.supabase.rpc(
-          'get_daily_check_in_counts',
-          { 
+          "get_daily_check_in_counts",
+          {
             team_id_param: input.teamId,
-            days_limit: input.limit
+            days_limit: input.limit,
           }
         );
 
         if (error) {
           // If the RPC function doesn't exist, fall back to a regular query
-          // This is for development purposes and can be removed later
-          const { data: fallbackData, error: fallbackError } = await ctx.supabase
-            .from("check_ins")
-            .select("check_in_date, count(*)")
-            .eq("team_id", input.teamId)
-            .group("check_in_date")
-            .order("check_in_date", { ascending: false })
-            .limit(input.limit);
+          const { data: fallbackData, error: fallbackError } =
+            await ctx.supabase
+              .from("check_ins")
+              .select("check_in_date, count:id")
+              .eq("team_id", input.teamId)
+              .group("check_in_date")
+              .order("check_in_date", { ascending: false })
+              .limit(input.limit);
 
           if (fallbackError) throw fallbackError;
-          return fallbackData || [];
+          return (
+            fallbackData?.map(
+              (row: { check_in_date: string; count: number }) => ({
+                check_in_date: row.check_in_date,
+                check_in_count: Number(row.count),
+              })
+            ) || []
+          );
         }
 
         return data || [];
@@ -132,13 +141,14 @@ export const checkInsRouter = router({
           .eq("check_in_date", input.date)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 is "no rows returned"
           throw error;
         }
 
         return {
           checkedIn: !!data,
-          checkInDetails: data || null
+          checkInDetails: data || null,
         };
       } catch (error) {
         console.error("Error fetching user check-in status:", error);
@@ -169,16 +179,21 @@ export const checkInsRouter = router({
         }
 
         // Check if the user already checked in today
-        const { data: existingCheckIn, error: checkInError } = await ctx.supabase
-          .from("check_ins")
-          .select("id")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .eq("check_in_date", input.date)
-          .single();
+        const { data: existingCheckIn, error: checkInError } =
+          await ctx.supabase
+            .from("check_ins")
+            .select("id")
+            .eq("team_id", input.teamId)
+            .eq("user_id", ctx.userId)
+            .eq("check_in_date", input.date)
+            .single();
 
         if (existingCheckIn) {
-          return { success: true, message: "Already checked in", alreadyCheckedIn: true };
+          return {
+            success: true,
+            message: "Already checked in",
+            alreadyCheckedIn: true,
+          };
         }
 
         // Create the check-in record
@@ -194,16 +209,16 @@ export const checkInsRouter = router({
           .single();
 
         if (error) throw error;
-        
-        return { 
+
+        return {
           success: true,
           message: "Successfully checked in",
           alreadyCheckedIn: false,
-          checkIn: data
+          checkIn: data,
         };
       } catch (error) {
         console.error("Error checking in:", error);
         throw error;
       }
     }),
-}); 
+});
