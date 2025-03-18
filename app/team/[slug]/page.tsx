@@ -124,7 +124,7 @@ export default function TeamPage() {
             <TabsContent value="tasks">
               <TaskList teamId={team.id} teamName={team.name} />
             </TabsContent>
-            <TabsContent value="analytics">
+            <TabsContent value="checkins">
               <CheckInsPage />
             </TabsContent>
           </Tabs>

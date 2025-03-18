@@ -1,18 +1,24 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { format, parseISO, subDays } from "date-fns"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Calendar, ChevronLeft, Loader2, Calendar as CalendarIcon, Users } from "lucide-react"
-import { api } from "@/lib/trpc/client"
-import { DatePicker } from "@/components/date-picker"
-import { UserList } from "@/components/user-list"
-import { toast } from "@/components/ui/use-toast"
-import { CheckInButton } from "@/components/check-in-button"
-import { CheckInStatusBar } from "@/components/check-in-status-bar"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { format, parseISO, subDays } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Calendar,
+  ChevronLeft,
+  Loader2,
+  Calendar as CalendarIcon,
+  Users,
+} from "lucide-react";
+import { api } from "@/lib/trpc/client";
+import { DatePicker } from "@/components/date-picker";
+import { UserList } from "@/components/user-list";
+import { toast } from "@/components/ui/use-toast";
+import { CheckInButton } from "@/components/check-in-button";
+import { CheckInStatusBar } from "@/components/check-in-status-bar";
+import { cn } from "@/lib/utils";
 
 interface HistoryItem {
   check_in_date: string;
@@ -34,29 +40,32 @@ interface CheckIn {
 }
 
 export default function CheckInsPage() {
-  const params = useParams()
-  const router = useRouter()
-  const slug = params?.slug as string
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [teamLoaded, setTeamLoaded] = useState(false)
-  
-  const formattedDate = format(selectedDate, "yyyy-MM-dd")
-  
-  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery({ slug }, {
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Team not found or you don't have access.",
-        variant: "destructive",
-      })
-      router.push("/")
-    },
-  })
-  
+  const params = useParams();
+  const router = useRouter();
+  const slug = params?.slug as string;
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [teamLoaded, setTeamLoaded] = useState(false);
+
+  const formattedDate = format(selectedDate, "yyyy-MM-dd");
+
+  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery(
+    { slug },
+    {
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Team not found or you don't have access.",
+          variant: "destructive",
+        });
+        router.push("/");
+      },
+    }
+  );
+
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
-    { 
+    {
       enabled: !!team?.id,
       onSuccess: (data) => {
         if (!data.hasAccess) {
@@ -64,61 +73,63 @@ export default function CheckInsPage() {
             title: "Access Denied",
             description: "You don't have access to this team.",
             variant: "destructive",
-          })
-          router.push("/")
+          });
+          router.push("/");
         } else {
-          setTeamLoaded(true)
+          setTeamLoaded(true);
         }
       },
       onError: () => {
-        router.push("/")
-      }
+        router.push("/");
+      },
     }
-  )
-  
+  );
+
   // Get team members
   const { data: teamMembers } = api.users.getTeamMembers.useQuery(
     { teamId: team?.id || "" },
     { enabled: !!team?.id && teamLoaded }
-  )
-  
+  );
+
   // Get check-ins for the selected date
-  const { data: checkIns, isLoading: checkInsLoading } = api.checkIns.getByTeamAndDate.useQuery(
-    { 
-      teamId: team?.id || "", 
-      date: formattedDate 
-    },
-    { enabled: !!team?.id && teamLoaded }
-  )
-  
+  const { data: checkIns, isLoading: checkInsLoading } =
+    api.checkIns.getByTeamAndDate.useQuery(
+      {
+        teamId: team?.id || "",
+        date: formattedDate,
+      },
+      { enabled: !!team?.id && teamLoaded }
+    );
+
   // Get daily history
-  const { data: history, isLoading: historyLoading } = api.checkIns.getHistory.useQuery(
-    { 
-      teamId: team?.id || "",
-      limit: 30
-    },
-    { enabled: !!team?.id && teamLoaded }
-  )
-  
-  const totalMembers = teamMembers?.length || 0
-  const checkedInCount = checkIns?.length || 0
-  
+  const { data: history, isLoading: historyLoading } =
+    api.checkIns.getHistory.useQuery(
+      {
+        teamId: team?.id || "",
+        limit: 30,
+      },
+      { enabled: !!team?.id && teamLoaded }
+    );
+
+  const totalMembers = teamMembers?.length || 0;
+  const checkedInCount = checkIns?.length || 0;
+
   const goBack = () => {
-    router.push(`/team/${slug}`)
-  }
+    router.push(`/team/${slug}`);
+  };
 
   if (teamLoading || !teamLoaded) {
     return (
       <div className="flex justify-center items-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   if (!team) {
-    return null
+    return null;
   }
-  
+
   return (
     <div className="container py-8">
       <div className="flex items-center justify-between mb-8">
@@ -134,9 +145,9 @@ export default function CheckInsPage() {
       </div>
 
       <div className="space-y-6">
-        <CheckInButton teamId={team.id} />
-        <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
-        
+        {/* <CheckInButton teamId={team.id} /> */}
+        {/* <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} /> */}
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
@@ -148,7 +159,7 @@ export default function CheckInsPage() {
             <DatePicker date={selectedDate} onDateChange={setSelectedDate} />
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
@@ -162,29 +173,34 @@ export default function CheckInsPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : checkIns && checkIns.length > 0 ? (
-              <UserList 
-                teamMembers={checkIns.map((c: CheckIn) => ({ 
+              <UserList
+                teamMembers={checkIns.map((c: CheckIn) => ({
                   id: c.userId,
-                  name: c.user.name || 'Unknown',
+                  name: c.user.name || "Unknown",
                   email: c.user.email,
                   avatar_url: c.user.avatar_url,
-                  role: 'member',
+                  role: "member",
                   notes: c.notes,
-                  checkedInAt: c.checkedInAt
-                }))} 
-                onClose={() => {}} 
+                  checkedInAt: c.checkedInAt,
+                }))}
+                onClose={() => {}}
                 showTime
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
                 <Calendar className="h-12 w-12 mb-4 text-muted-foreground/50" />
                 <h3 className="text-lg font-medium mb-1">No Check-ins</h3>
-                <p className="max-w-sm mb-6">No team members have checked in for this date yet.</p>
-                
-                {format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") && (
-                  <Button 
+                <p className="max-w-sm mb-6">
+                  No team members have checked in for this date yet.
+                </p>
+
+                {format(selectedDate, "yyyy-MM-dd") ===
+                  format(new Date(), "yyyy-MM-dd") && (
+                  <Button
                     variant="outline"
-                    onClick={() => document.getElementById('check-in-button')?.click()}
+                    onClick={() =>
+                      document.getElementById("check-in-button")?.click()
+                    }
                   >
                     Check In Now
                   </Button>
@@ -195,5 +211,5 @@ export default function CheckInsPage() {
         </Card>
       </div>
     </div>
-  )
-} 
+  );
+}

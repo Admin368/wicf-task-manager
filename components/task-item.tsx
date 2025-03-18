@@ -78,7 +78,10 @@ export function TaskItem({
       console.error("Failed to toggle completion:", error);
       toast({
         title: "Error",
-        description: "Failed to update task status. Please try again.",
+        description:
+          error.message === "You must check in before completing tasks"
+            ? "Please check in for today before completing tasks"
+            : "Failed to update task status. Please try again.",
         variant: "destructive",
       });
       // Revert optimistic update
