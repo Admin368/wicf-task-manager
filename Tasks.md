@@ -1,3 +1,4 @@
 # Bugs
-[] Refresh on login
-[] Put the tools of the tasks at the bottom of the task for mobile 
+[x] Refresh on login
+[x] full width for modbile
+[x] refresh rate 10s
