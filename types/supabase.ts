@@ -121,6 +121,32 @@ export interface Database {
           created_at?: string
         }
       }
+      check_ins: {
+        Row: {
+          id: string
+          team_id: string
+          user_id: string
+          check_in_date: string
+          checked_in_at: string
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          user_id: string
+          check_in_date: string
+          checked_in_at?: string
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          user_id?: string
+          check_in_date?: string
+          checked_in_at?: string
+          notes?: string | null
+        }
+      }
     }
   }
 }

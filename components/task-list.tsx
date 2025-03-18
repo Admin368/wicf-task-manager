@@ -216,7 +216,7 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
         </div>
 
         {showUserList && teamMembers && (
-          <UserList users={teamMembers} onClose={() => setShowUserList(false)} />
+          <UserList teamMembers={teamMembers} onClose={() => setShowUserList(false)} />
         )}
 
         <div className="border rounded-md">

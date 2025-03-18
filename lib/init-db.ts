@@ -58,6 +58,20 @@ export async function initDatabase() {
           PRIMARY KEY (team_id, user_id)
         );
 
+        -- Check-ins table to track user attendance
+        CREATE TABLE IF NOT EXISTS check_ins (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          check_in_date DATE NOT NULL,
+          checked_in_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+          notes TEXT,
+          UNIQUE(team_id, user_id, check_in_date)
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_check_ins_team_date ON check_ins(team_id, check_in_date);
+        CREATE INDEX IF NOT EXISTS idx_check_ins_user ON check_ins(user_id);
+
         CREATE TABLE IF NOT EXISTS completions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

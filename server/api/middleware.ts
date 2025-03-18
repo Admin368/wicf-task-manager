@@ -27,7 +27,7 @@ export const isAuthenticated = t.middleware(async ({ ctx, next }) => {
   if (!userId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
-      message: "User ID not found in request",
+      message: "User ID not found in request, refresh the page and try again.",
     });
   }
   
