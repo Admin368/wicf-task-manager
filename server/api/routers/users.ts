@@ -18,6 +18,57 @@ export const usersRouter = router({
     }
   }),
 
+  getTeamMembers: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        // First verify the user has access to this team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
+        // Get all team members with user details
+        const { data, error } = await ctx.supabase
+          .from("team_members")
+          .select(`
+            user_id,
+            role,
+            users:user_id (
+              id,
+              name,
+              email,
+              avatar_url
+            )
+          `)
+          .eq("team_id", input.teamId);
+
+        if (error) throw error;
+        
+        // Transform the data to a more usable format
+        const members = data.map(member => ({
+          id: member.user_id,
+          role: member.role,
+          ...member.users,
+        }));
+
+        return members || [];
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+        return [];
+      }
+    }),
+
   getOrCreate: publicProcedure.use(withSupabase)
     .input(
       z.object({

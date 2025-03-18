@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { Plus, Users, AlertTriangle } from "lucide-react"
+import { Plus, Users, AlertTriangle, Loader2 } from "lucide-react"
 import { api } from "@/lib/trpc/client"
 import { DatePicker } from "./date-picker"
 import { TaskItem } from "./task-item"
@@ -49,11 +49,20 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
     },
   )
 
-  const { data: users, error: usersError } = api.users.getAll.useQuery(undefined, {
-    onError: (err) => {
-      console.error("Error fetching users:", err)
+  // Fetch team members instead of all users
+  const {
+    data: teamMembers,
+    isLoading: isLoadingMembers,
+    error: membersError,
+  } = api.users.getTeamMembers.useQuery(
+    { teamId },
+    {
+      onError: (err) => {
+        console.error("Error fetching team members:", err)
+        setError("Failed to load team members. Please try refreshing the page.")
+      },
     },
-  })
+  )
 
   // Mutations
   const createTask = api.tasks.create.useMutation({
@@ -175,9 +184,23 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
           <DatePicker date={selectedDate} onDateChange={handleDateChange} />
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowUserList(!showUserList)}>
-              <Users className="h-4 w-4 mr-2" />
-              Team Members
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowUserList(!showUserList)}
+              disabled={isLoadingMembers}
+            >
+              {isLoadingMembers ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Users className="h-4 w-4 mr-2" />
+                  Team Members ({teamMembers?.length || 0})
+                </>
+              )}
             </Button>
 
             <Button
@@ -192,7 +215,9 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
           </div>
         </div>
 
-        {showUserList && users && <UserList users={users} onClose={() => setShowUserList(false)} />}
+        {showUserList && teamMembers && (
+          <UserList users={teamMembers} onClose={() => setShowUserList(false)} />
+        )}
 
         <div className="border rounded-md">
           <div className="p-4 border-b bg-muted/50">
