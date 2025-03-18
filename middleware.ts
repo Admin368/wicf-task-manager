@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { withAuth } from "next-auth/middleware";
 
-// This function can be marked `async` if using `await` inside
-export async function middleware(request: NextRequest) {
-  return NextResponse.next();
-}
+export default withAuth({
+  pages: {
+    signIn: "/login",
+  },
+});
 
-// See "Matching Paths" below to learn more
 export const config = {
-  matcher: "/",
+  matcher: [
+    "/account/:path*",
+    "/teams/:path*",
+    "/api/account/:path*",
+    "/api/teams/:path*",
+  ],
 };

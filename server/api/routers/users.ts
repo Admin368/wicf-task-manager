@@ -3,6 +3,7 @@ import { router, publicProcedure } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
+import { hashPassword } from "@/lib/auth";
 
 export const usersRouter = router({
   getAll: publicProcedure.query(async ({ ctx }) => {
@@ -92,19 +93,36 @@ export const usersRouter = router({
           if (existingUser) return existingUser;
         }
 
-        // Otherwise create a new user
+        // Generate a temporary email if none provided
+        const tempEmail =
+          input.email ||
+          `temp-${input.name
+            .toLowerCase()
+            .replace(/\s+/g, "-")}-${Date.now()}@temporary.com`;
+
+        // Generate a temporary password
+        const tempPassword = `temp-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+        const hashedPassword = await hashPassword(tempPassword);
+
+        // Create a new user
         const user = await ctx.prisma.user.create({
           data: {
             name: input.name,
-            email: input.email,
+            email: tempEmail,
+            password: hashedPassword,
             avatarUrl: input.avatarUrl,
           },
         });
 
         return user;
       } catch (error) {
-        console.error("Error creating user:", error);
-        throw error;
+        console.error("Error in getOrCreate:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get or create user",
+        });
       }
     }),
 
@@ -131,6 +149,7 @@ export const usersRouter = router({
 
         if (
           !currentUserRole ||
+          !currentUserRole.role ||
           !["admin", "owner"].includes(currentUserRole.role)
         ) {
           throw new TRPCError({

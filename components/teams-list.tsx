@@ -102,7 +102,7 @@ export function TeamsList() {
           <Plus className="mr-2 h-4 w-4" />
           Create Team
         </Button>
-        {userId && <Button onClick={handleLogout}>Logout</Button>}
+        {/* {userId && <Button onClick={handleLogout}>Logout</Button>} */}
       </div>
 
       {/* Search bar */}

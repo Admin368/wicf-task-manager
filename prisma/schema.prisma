@@ -23,14 +23,18 @@ model Team {
 }
 
 model User {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  email       String?      @unique
-  avatarUrl   String?      @map("avatar_url")
-  createdAt   DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
-  checkIns    CheckIn[]
-  completions TaskCompletion[]
-  teamMembers TeamMember[]
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  email         String       @unique
+  password      String
+  emailVerified DateTime?    @map("email_verified")
+  resetToken    String?      @map("reset_token")
+  resetTokenExpiry DateTime? @map("reset_token_expiry")
+  avatarUrl     String?      @map("avatar_url")
+  createdAt     DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
+  checkIns      CheckIn[]
+  completions   TaskCompletion[]
+  teamMembers   TeamMember[]
 
   @@map("users")
 }
