@@ -80,7 +80,7 @@ export default function TeamPage() {
         <div className="space-y-6">
           <CheckInButton teamId={team.id} />
           <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
-          <CheckInHistory teamId={team.id} />
+          {/* <CheckInHistory teamId={team.id} /> */}
           
           <Button variant="outline" className="w-full" onClick={() => router.push(`/team/${slug}/check-ins`)}>
             <ExternalLink className="h-4 w-4 mr-2" />

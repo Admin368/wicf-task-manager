@@ -39,9 +39,11 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
     data: completions,
     isLoading: isLoadingCompletions,
     error: completionsError,
+    refetch: refetchCompletions,
   } = api.completions.getByDate.useQuery(
     { date: formattedDate },
     {
+      refetchInterval: 10000,
       onError: (err) => {
         console.error("Error fetching completions:", err)
         setError("Failed to load task completions. Please try refreshing the page.")
@@ -57,6 +59,9 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
   } = api.users.getTeamMembers.useQuery(
     { teamId },
     {
+      onSuccess: (data) => {
+        console.log("teamMembers", data)
+      },
       onError: (err) => {
         console.error("Error fetching team members:", err)
         setError("Failed to load team members. Please try refreshing the page.")
@@ -160,7 +165,7 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
+    <div className="">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">{teamName}</h1>
@@ -210,7 +215,7 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Task
+              {/* Add Task */}
             </Button>
           </div>
         </div>
@@ -222,6 +227,11 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
         <div className="border rounded-md">
           <div className="p-4 border-b bg-muted/50">
             <h2 className="font-semibold">Tasks for {format(selectedDate, "MMMM d, yyyy")}</h2>
+          </div>
+          <div className="p-4 border-b bg-muted/50">
+            <Button variant="outline" size="sm" onClick={() => {
+              refetchCompletions?.()
+            }}>Refresh</Button>
           </div>
 
           <div className="p-2">
@@ -257,6 +267,8 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
                       setShowTaskDialog(true)
                     }}
                     onDeleteTask={handleDeleteTask}
+                    refetchCompletions={refetchCompletions}
+                    teamMembers={teamMembers || []}
                   />
                 ))}
               </div>

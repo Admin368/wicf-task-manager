@@ -7,11 +7,6 @@ export const createServerSupabaseClient = () => {
   const supabaseKey =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1cHhyeGtlaXdxdGlwenlycW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIxMDM3NzAsImV4cCI6MjA1NzY3OTc3MH0.oBRgtUdRV2eYgeP38XmyJwEVU0IyR9uX89VL5uFQF2c";
 
-  console.log({
-    supabaseUrl,
-    supabaseKey,
-  });
-
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Missing Supabase environment variables");
   }

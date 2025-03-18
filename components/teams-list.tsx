@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { api } from "@/lib/trpc/client"
 import { Loader2, Lock, Plus, Search } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-
+import { useUser } from "./user-provider"
 type Team = {
   id: string
   name: string
@@ -21,6 +21,7 @@ export function TeamsList() {
   const [teamPassword, setTeamPassword] = useState<Record<string, string>>({})
   const [joiningTeam, setJoiningTeam] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const { userId, userName, isLoading: isUserLoading } = useUser()
 
   const { data: teams, isLoading } = api.teams.getAll.useQuery()
   
@@ -68,6 +69,13 @@ export function TeamsList() {
     router.push("/create-team")
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem("userId")
+    localStorage.removeItem("userName")
+    window.location.reload()
+    // router.push("/")
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-12">
@@ -82,8 +90,11 @@ export function TeamsList() {
         <h2 className="text-2xl font-bold tracking-tight">Teams</h2>
         <Button onClick={handleGoToCreateTeam}>
           <Plus className="mr-2 h-4 w-4" />
-          Create New Team
+          Create Team
         </Button>
+        {userId && <Button onClick={handleLogout}>
+          Logout
+        </Button>}
       </div>
       
       {/* Search bar */}

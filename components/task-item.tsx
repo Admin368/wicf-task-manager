@@ -19,24 +19,28 @@ interface TaskItemProps {
   }
   tasks: any[]
   completions: any[]
+  teamMembers: any[]
   selectedDate: string
   level?: number
   onAddSubtask?: (parentId: string) => void
   onEditTask?: (task: any) => void
   onDeleteTask?: (taskId: string) => void
   className?: string
+  refetchCompletions?: () => void
 }
 
 export function TaskItem({
   task,
   tasks,
   completions,
+  teamMembers,
   selectedDate,
   level = 0,
   onAddSubtask,
   onEditTask,
   onDeleteTask,
   className,
+  refetchCompletions,
 }: TaskItemProps) {
   const { userId } = useUser()
   const [expanded, setExpanded] = useState(true)
@@ -59,7 +63,7 @@ export function TaskItem({
     },
   })
 
-  const utils = api.useContext()
+  // const utils = api.useContext()
 
   // Get child tasks
   const childTasks = tasks.filter((t) => t.parent_id === task.id).sort((a, b) => a.position - b.position)
@@ -91,11 +95,13 @@ export function TaskItem({
             event: "*",
             schema: "public",
             table: "completions",
-            filter: `task_id=eq.${task.id}`,
+            // filter: `task_id=eq.${task.id}`,
           },
           () => {
             // Refetch completions when changes occur
-            utils.completions.getByDate.invalidate({ date: selectedDate })
+            // utils.completions.getByDate.invalidate({ date: selectedDate })
+            console.log("refetching completions")
+            refetchCompletions?.()
           },
         )
         .subscribe((status: any) => {
@@ -118,7 +124,7 @@ export function TaskItem({
         }
       }
     }
-  }, [task.id, selectedDate, utils.completions.getByDate])
+  }, [task.id, selectedDate, refetchCompletions])
 
   const handleCheckboxChange = async (checked: boolean | "indeterminate") => {
     if (!userId || typeof checked !== "boolean") return
@@ -142,7 +148,9 @@ export function TaskItem({
       })
 
       // Refetch to ensure data consistency
-      utils.completions.getByDate.invalidate({ date: selectedDate })
+      // utils.completions.getByDate.invalidate({ date: selectedDate })
+      // console.log("refetching completions")
+      refetchCompletions?.()
     } catch (error) {
       console.error("Failed to toggle completion:", error)
       // UI will be reverted by the onError handler in the mutation
@@ -209,7 +217,7 @@ export function TaskItem({
 
           {isCompleted && completedBy && (
             <div className="text-xs text-muted-foreground">
-              Task completed by {completedBy === userId ? "you" : "another user"}
+              Task completed by {completedBy === userId ? "you" : teamMembers?.find(member => member.id === completedBy)?.name}
             </div>
           )}
 
@@ -259,6 +267,7 @@ export function TaskItem({
                 onAddSubtask={onAddSubtask}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
+                teamMembers={teamMembers}
               />
             ))}
           </div>

@@ -38,6 +38,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         setUserId(storedUserId)
         setUserName(storedUserName)
         setIsLoading(false)
+        // window.location.reload()
       } else {
         // Create a temporary anonymous user if none exists
         // This ensures we always have a userId
@@ -74,6 +75,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setUserId(user.id)
       setUserName(user.name)
       setShowDialog(false)
+      window.location.reload()
     } catch (error) {
       console.error("Failed to create user:", error)
     }
