@@ -2,12 +2,12 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -28,39 +28,43 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
   const today = format(new Date(), "yyyy-MM-dd");
 
   // Get the user's check-in status for today
-  const { data: checkInStatus, isLoading: checkingStatus, refetch: refetchStatus } = 
-    api.checkIns.getUserCheckInStatus.useQuery({ 
-      teamId, 
-      date: today,
-    });
+  const {
+    data: checkInStatus,
+    isLoading: checkingStatus,
+    refetch: refetchStatus,
+  } = api.checkIns.getUserCheckInStatus.useQuery({
+    teamId,
+    date: today,
+  });
 
   // Mutation for checking in
-  const { mutate: checkIn, isLoading: isCheckingIn } = api.checkIns.checkIn.useMutation({
-    onSuccess: (data) => {
-      if (data.alreadyCheckedIn) {
+  const { mutate: checkIn, isLoading: isCheckingIn } =
+    api.checkIns.checkIn.useMutation({
+      onSuccess: (data) => {
+        if (data.alreadyCheckedIn) {
+          toast({
+            title: "Already checked in",
+            description: "You've already checked in today.",
+          });
+        } else {
+          toast({
+            title: "Checked in successfully",
+            description: "You've been marked as present for today.",
+          });
+        }
+        setOpen(false);
+        setNotes("");
+        refetchStatus();
+        router.refresh();
+      },
+      onError: (error) => {
         toast({
-          title: "Already checked in",
-          description: "You've already checked in today.",
+          title: "Check-in failed",
+          description: error.message || "Failed to check in. Please try again.",
+          variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Checked in successfully",
-          description: "You've been marked as present for today.",
-        });
-      }
-      setOpen(false);
-      setNotes("");
-      refetchStatus();
-      router.refresh();
-    },
-    onError: (error) => {
-      toast({
-        title: "Check-in failed",
-        description: error.message || "Failed to check in. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+      },
+    });
 
   const handleCheckIn = () => {
     checkIn({
@@ -91,7 +95,7 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
             <span>Already Checked In Today</span>
           </>
         ) : (
-          <span>Check In Today</span>
+          <span>{`I have Arrived (Check In)`}</span>
         )}
       </Button>
 
@@ -100,10 +104,11 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
           <DialogHeader>
             <DialogTitle>Daily Check-In</DialogTitle>
             <DialogDescription>
-              Confirm your presence for today, {format(new Date(), "EEEE, MMMM do, yyyy")}.
+              Confirm your presence for today,{" "}
+              {format(new Date(), "EEEE, MMMM do, yyyy")}.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Notes (optional)</p>
@@ -115,17 +120,14 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
               />
             </div>
           </div>
-          
+
           <DialogFooter className="sm:justify-between">
             <DialogClose asChild>
               <Button type="button" variant="outline">
                 Cancel
               </Button>
             </DialogClose>
-            <Button 
-              onClick={handleCheckIn} 
-              disabled={isCheckingIn}
-            >
+            <Button onClick={handleCheckIn} disabled={isCheckingIn}>
               {isCheckingIn ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -140,4 +142,4 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
       </Dialog>
     </>
   );
-} 
+}
