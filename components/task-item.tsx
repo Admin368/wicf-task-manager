@@ -66,6 +66,13 @@ export function TaskItem({
     null
   );
 
+  // Check if current user is admin
+  const isAdmin = teamMembers?.find(
+    (member) =>
+      member.id === userId &&
+      (member.role === "admin" || member.role === "owner")
+  );
+
   const toggleCompletion = api.completions.toggle.useMutation({
     onError: (error) => {
       console.error("Failed to toggle completion:", error);
@@ -273,59 +280,68 @@ export function TaskItem({
               </div>
             )}
 
-            <div className="flex items-center gap-1" hidden>
-              {onAddSubtask && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => onAddSubtask(task.id)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
+            {isAdmin && (
+              <div className="flex items-center gap-1">
+                {onAddSubtask && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onAddSubtask(task.id)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                )}
 
-              {onEditTask && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => onEditTask(task)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
+                {onEditTask && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onEditTask(task)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
 
-              {onDeleteTask && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={() => onDeleteTask(task.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+                {onDeleteTask && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => onDeleteTask(task.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
 
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-8 w-8 shrink-0", isFirst && "opacity-50")}
-                disabled={isFirst}
-                onClick={() => onMoveTask?.(task.id, "up")}
-              >
-                <ArrowUp className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("h-8 w-8 shrink-0", isLast && "opacity-50")}
-                disabled={isLast}
-                onClick={() => onMoveTask?.(task.id, "down")}
-              >
-                <ArrowDown className="h-5 w-5" />
-              </Button>
-            </div>
+                {onMoveTask && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 shrink-0",
+                        isFirst && "opacity-50"
+                      )}
+                      disabled={isFirst}
+                      onClick={() => onMoveTask(task.id, "up")}
+                    >
+                      <ArrowUp className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn("h-8 w-8 shrink-0", isLast && "opacity-50")}
+                      disabled={isLast}
+                      onClick={() => onMoveTask(task.id, "down")}
+                    >
+                      <ArrowDown className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

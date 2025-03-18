@@ -41,7 +41,8 @@ export const usersRouter = router({
         // Get all team members with user details
         const { data, error } = await ctx.supabase
           .from("team_members")
-          .select(`
+          .select(
+            `
             user_id,
             role,
             users:user_id (
@@ -50,13 +51,14 @@ export const usersRouter = router({
               email,
               avatar_url
             )
-          `)
+          `
+          )
           .eq("team_id", input.teamId);
 
         if (error) throw error;
-        
+
         // Transform the data to a more usable format
-        const members = data.map(member => ({
+        const members = data.map((member) => ({
           id: member.user_id,
           role: member.role,
           ...member.users,
@@ -69,7 +71,8 @@ export const usersRouter = router({
       }
     }),
 
-  getOrCreate: publicProcedure.use(withSupabase)
+  getOrCreate: publicProcedure
+    .use(withSupabase)
     .input(
       z.object({
         name: z.string().min(1),
@@ -105,6 +108,49 @@ export const usersRouter = router({
         return data;
       } catch (error) {
         console.error("Error creating user:", error);
+        throw error;
+      }
+    }),
+
+  updateRole: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        userId: z.string().uuid(),
+        role: z.enum(["member", "admin"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // First verify the current user is an admin
+        const { data: currentUserRole, error: roleError } = await ctx.supabase
+          .from("team_members")
+          .select("role")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (roleError) throw new Error("Failed to verify user role");
+        if (
+          !currentUserRole ||
+          !["admin", "owner"].includes(currentUserRole.role)
+        ) {
+          throw new Error("You don't have permission to update roles");
+        }
+
+        // Update the target user's role
+        const { error: updateError } = await ctx.supabase
+          .from("team_members")
+          .update({ role: input.role })
+          .eq("team_id", input.teamId)
+          .eq("user_id", input.userId)
+          .not("role", "eq", "owner"); // Prevent updating owner's role
+
+        if (updateError) throw updateError;
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error updating user role:", error);
         throw error;
       }
     }),

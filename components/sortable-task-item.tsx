@@ -1,36 +1,37 @@
-"use client"
+"use client";
 
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { TaskItem } from "./task-item"
-import { cn } from "@/lib/utils"
-import type { Task } from "@/types/task"
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { TaskItem } from "./task-item";
+import { cn } from "@/lib/utils";
+import type { Task } from "@/types/task";
 import {
   DndContext,
   DragEndEvent,
   PointerSensor,
   useSensor,
   useSensors,
-} from "@dnd-kit/core"
+} from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
+} from "@dnd-kit/sortable";
+import { useUser } from "./user-provider";
 
 interface SortableTaskItemProps {
-  id: string
-  task: Task
-  tasks: Task[]
-  completions: any[]
-  teamMembers: any[]
-  selectedDate: string
-  level?: number
-  onAddSubtask?: (parentId: string) => void
-  onEditTask?: (task: any) => void
-  onDeleteTask?: (taskId: string) => void
-  className?: string
-  refetchCompletions?: () => void
-  onDragEnd?: (event: DragEndEvent) => void
+  id: string;
+  task: Task;
+  tasks: Task[];
+  completions: any[];
+  teamMembers: any[];
+  selectedDate: string;
+  level?: number;
+  onAddSubtask?: (parentId: string) => void;
+  onEditTask?: (task: any) => void;
+  onDeleteTask?: (taskId: string) => void;
+  className?: string;
+  refetchCompletions?: () => void;
+  onDragEnd?: (event: DragEndEvent) => void;
 }
 
 export function SortableTaskItem({
@@ -48,6 +49,15 @@ export function SortableTaskItem({
   refetchCompletions,
   onDragEnd,
 }: SortableTaskItemProps) {
+  const { userId } = useUser();
+
+  // Check if current user is admin
+  const isAdmin = teamMembers?.find(
+    (member) =>
+      member.id === userId &&
+      (member.role === "admin" || member.role === "owner")
+  );
+
   const {
     attributes,
     listeners,
@@ -55,15 +65,17 @@ export function SortableTaskItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id })
+  } = useSortable({ id, disabled: !isAdmin });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  }
+  };
 
   // Get child tasks
-  const childTasks = tasks.filter((t) => t.parent_id === task.id).sort((a, b) => a.position - b.position)
+  const childTasks = tasks
+    .filter((t) => t.parent_id === task.id)
+    .sort((a, b) => a.position - b.position);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -71,7 +83,7 @@ export function SortableTaskItem({
         distance: 8,
       },
     })
-  )
+  );
 
   return (
     <div
@@ -92,12 +104,15 @@ export function SortableTaskItem({
         onDeleteTask={onDeleteTask}
         className={className}
         refetchCompletions={refetchCompletions}
-        dragHandleProps={listeners}
+        dragHandleProps={isAdmin ? listeners : undefined}
       />
 
       {childTasks.length > 0 && (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <SortableContext items={childTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={childTasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
             <div className="ml-4">
               {childTasks.map((childTask) => (
                 <SortableTaskItem
@@ -121,5 +136,5 @@ export function SortableTaskItem({
         </DndContext>
       )}
     </div>
-  )
-} 
+  );
+}
