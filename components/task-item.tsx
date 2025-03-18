@@ -9,6 +9,7 @@ import { useUser } from "./user-provider"
 import { getClientSupabaseClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
+import { TaskCompletionModal } from "./task-completion-modal"
 
 interface TaskItemProps {
   task: {
@@ -42,6 +43,8 @@ export function TaskItem({
   const [isCompleted, setIsCompleted] = useState(false)
   const [completedBy, setCompletedBy] = useState<string | null>(null)
   const [supabaseError, setSupabaseError] = useState<string | null>(null)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [pendingCompletion, setPendingCompletion] = useState<boolean | null>(null)
 
   const toggleCompletion = api.completions.toggle.useMutation({
     onError: (error) => {
@@ -120,6 +123,12 @@ export function TaskItem({
   const handleCheckboxChange = async (checked: boolean | "indeterminate") => {
     if (!userId || typeof checked !== "boolean") return
 
+    // Store the pending completion state
+    setPendingCompletion(checked)
+    setShowCompletionModal(true)
+  }
+
+  const completeTask = async (checked: boolean) => {
     try {
       // Optimistically update UI
       setIsCompleted(checked)
@@ -127,7 +136,7 @@ export function TaskItem({
       // Call the API to update the task status
       await toggleCompletion.mutateAsync({
         taskId: task.id,
-        userId,
+        userId: userId || "", // Ensure userId is a string
         date: selectedDate,
         completed: checked,
       })
@@ -149,94 +158,121 @@ export function TaskItem({
     }
   }
 
+  const handleConfirmCompletion = () => {
+    if (pendingCompletion !== null) {
+      completeTask(!!pendingCompletion)
+    }
+    setShowCompletionModal(false)
+    setPendingCompletion(null)
+  }
+
+  const handleCancelCompletion = () => {
+    setShowCompletionModal(false)
+    setPendingCompletion(null)
+    // Reset UI state if needed
+    if (pendingCompletion) {
+      setIsCompleted(false)
+    }
+  }
+
   return (
-    <div className={className}>
-      <div
-        className={cn(
-          "flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors",
-          isCompleted && "bg-muted/30",
-        )}
-        style={{ paddingLeft: `${(level + 1) * 12}px` }}
-      >
-        {childTasks.length > 0 ? (
-          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setExpanded(!expanded)}>
-            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        ) : (
-          <div className="w-5" />
-        )}
-
-        <Checkbox
-          checked={isCompleted}
-          onCheckedChange={handleCheckboxChange}
-          id={`task-${task.id}`}
-          className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-        />
-
-        <label
-          htmlFor={`task-${task.id}`}
-          className={cn("flex-grow text-sm cursor-pointer", isCompleted && "line-through text-muted-foreground")}
+    <>
+      <div className={className}>
+        <div
+          className={cn(
+            "flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors",
+            isCompleted && "bg-muted/30",
+          )}
+          style={{ paddingLeft: `${(level + 1) * 12}px` }}
         >
-          {task.title}
-        </label>
+          {childTasks.length > 0 ? (
+            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setExpanded(!expanded)}>
+              {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </Button>
+          ) : (
+            <div className="w-5" />
+          )}
 
-        {isCompleted && completedBy && (
-          <div className="text-xs text-muted-foreground">
-            Task completed by {completedBy === userId ? "you" : "another user"}
+          <Checkbox
+            checked={isCompleted}
+            onCheckedChange={handleCheckboxChange}
+            id={`task-${task.id}`}
+            className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+          />
+
+          <label
+            htmlFor={`task-${task.id}`}
+            className={cn("flex-grow text-sm cursor-pointer", isCompleted && "line-through text-muted-foreground")}
+          >
+            {task.title}
+          </label>
+
+          {isCompleted && completedBy && (
+            <div className="text-xs text-muted-foreground">
+              Task completed by {completedBy === userId ? "you" : "another user"}
+            </div>
+          )}
+
+          {supabaseError && (
+            <div className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              <span>Sync error</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1">
+            {onAddSubtask && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSubtask(task.id)}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+
+            {onEditTask && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditTask(task)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+
+            {onDeleteTask && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={() => onDeleteTask(task.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )}
-
-        {supabaseError && (
-          <div className="text-xs text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            <span>Sync error</span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-1">
-          {onAddSubtask && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSubtask(task.id)}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
-
-          {onEditTask && (
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditTask(task)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-          )}
-
-          {onDeleteTask && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={() => onDeleteTask(task.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
         </div>
+
+        {expanded && childTasks.length > 0 && (
+          <div className="ml-4">
+            {childTasks.map((childTask) => (
+              <TaskItem
+                key={childTask.id}
+                task={childTask}
+                tasks={tasks}
+                completions={completions}
+                selectedDate={selectedDate}
+                level={level + 1}
+                onAddSubtask={onAddSubtask}
+                onEditTask={onEditTask}
+                onDeleteTask={onDeleteTask}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {expanded && childTasks.length > 0 && (
-        <div className="ml-4">
-          {childTasks.map((childTask) => (
-            <TaskItem
-              key={childTask.id}
-              task={childTask}
-              tasks={tasks}
-              completions={completions}
-              selectedDate={selectedDate}
-              level={level + 1}
-              onAddSubtask={onAddSubtask}
-              onEditTask={onEditTask}
-              onDeleteTask={onDeleteTask}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      <TaskCompletionModal
+        taskTitle={task.title}
+        isOpen={showCompletionModal}
+        isChecking={pendingCompletion}
+        onConfirm={handleConfirmCompletion}
+        onCancel={handleCancelCompletion}
+      />
+    </>
   )
 }
 
