@@ -36,26 +36,34 @@ export const completionsRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         if (input.completed) {
-          // Add completion
+          // Get all users from the database
+          const { data: users, error: usersError } = await ctx.supabase
+            .from("users")
+            .select("id");
+
+          if (usersError) throw usersError;
+
+          // Add completion for all users, marking the original user as the completer
+          const completions = users.map(user => ({
+            task_id: input.taskId,
+            user_id: user.id,
+            completed_date: input.date,
+            completed_by: input.userId, // Track who completed it
+          }));
+
           const { data, error } = await ctx.supabase
             .from("completions")
-            .insert({
-              task_id: input.taskId,
-              user_id: input.userId,
-              completed_date: input.date,
-            })
-            .select()
-            .single();
+            .insert(completions)
+            .select();
 
           if (error && error.code !== "23505") throw error; // Ignore unique violation errors
           return data;
         } else {
-          // Remove completion
+          // Remove completion for all users
           const { error } = await ctx.supabase
             .from("completions")
             .delete()
             .eq("task_id", input.taskId)
-            .eq("user_id", input.userId)
             .eq("completed_date", input.date);
 
           if (error) throw error;

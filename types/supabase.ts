@@ -33,6 +33,7 @@ export interface Database {
           user_id: string
           completed_date: string
           completed_at: string
+          completed_by: string
         }
         Insert: {
           id?: string
@@ -40,6 +41,7 @@ export interface Database {
           user_id: string
           completed_date: string
           completed_at?: string
+          completed_by: string
         }
         Update: {
           id?: string
@@ -47,6 +49,7 @@ export interface Database {
           user_id?: string
           completed_date?: string
           completed_at?: string
+          completed_by?: string
         }
       }
       users: {

@@ -40,7 +40,7 @@ export function TaskItem({
   const { userId } = useUser()
   const [expanded, setExpanded] = useState(true)
   const [isCompleted, setIsCompleted] = useState(false)
-  const [completedBy, setCompletedBy] = useState<string[]>([])
+  const [completedBy, setCompletedBy] = useState<string | null>(null)
   const [supabaseError, setSupabaseError] = useState<string | null>(null)
 
   const toggleCompletion = api.completions.toggle.useMutation({
@@ -61,22 +61,16 @@ export function TaskItem({
   // Get child tasks
   const childTasks = tasks.filter((t) => t.parent_id === task.id).sort((a, b) => a.position - b.position)
 
-  // Check if task is completed by current user
+  // Check if task is completed and who completed it
   useEffect(() => {
     if (!userId) return
 
-    const isTaskCompleted = completions.some(
-      (c) => c.task_id === task.id && c.user_id === userId && c.completed_date === selectedDate,
+    const completion = completions.find(
+      (c) => c.task_id === task.id && c.completed_date === selectedDate
     )
 
-    setIsCompleted(isTaskCompleted)
-
-    // Get all users who completed this task
-    const usersWhoCompleted = completions
-      .filter((c) => c.task_id === task.id && c.completed_date === selectedDate)
-      .map((c) => c.user_id)
-
-    setCompletedBy(usersWhoCompleted)
+    setIsCompleted(!!completion)
+    setCompletedBy(completion?.completed_by || null)
   }, [completions, task.id, userId, selectedDate])
 
   // Subscribe to real-time updates
@@ -176,9 +170,9 @@ export function TaskItem({
           {task.title}
         </label>
 
-        {completedBy.length > 0 && (
+        {isCompleted && completedBy && (
           <div className="text-xs text-muted-foreground">
-            {completedBy.length} {completedBy.length === 1 ? "person" : "people"} completed
+            Task completed by {completedBy === userId ? "you" : "another user"}
           </div>
         )}
 

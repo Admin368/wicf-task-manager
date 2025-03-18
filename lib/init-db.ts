@@ -34,9 +34,11 @@ export async function initDatabase() {
         CREATE TABLE IF NOT EXISTS completions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          user_id UUID NOT NULL,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           completed_date DATE NOT NULL,
-          completed_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+          completed_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+          completed_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          CONSTRAINT fk_completed_by FOREIGN KEY (completed_by) REFERENCES users(id)
         );
       `)
 
