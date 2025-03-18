@@ -17,7 +17,8 @@ export const tasksRouter = router({
           .select("*")
           .eq("team_id", input.teamId)
           .eq("user_id", ctx.userId)
-          .single();
+          .single()
+          .order("created_at",  { ascending: false });
 
         if (membershipError || !membership) {
           throw new Error("You don't have access to this team");
