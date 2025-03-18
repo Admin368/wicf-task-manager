@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,6 +48,10 @@ export function TaskDialog({
     initialData?.parent_id || null
   );
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    setParentId(initialData?.parent_id || null);
+  }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

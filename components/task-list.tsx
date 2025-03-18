@@ -132,12 +132,12 @@ export function TaskList() {
   }
 
   const handleAddSubtask = (parentId: string) => {
-    setEditingTask(null)
-    setShowTaskDialog(true)
-    // Pre-select the parent
+    // Find the parent task
     const parentTask = tasks?.find((t) => t.id === parentId)
     if (parentTask) {
+      // Set the initial data with parent_id
       setEditingTask({ parent_id: parentId })
+      setShowTaskDialog(true)
     }
   }
 
@@ -249,7 +249,7 @@ export function TaskList() {
           }}
           onSubmit={editingTask?.id ? handleEditTask : handleAddTask}
           title={editingTask?.id ? "Edit Task" : "Add Task"}
-          initialData={editingTask?.id ? editingTask : undefined}
+          initialData={editingTask}
           tasks={tasks || []}
         />
       )}
