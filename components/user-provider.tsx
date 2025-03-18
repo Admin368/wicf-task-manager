@@ -29,18 +29,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const getOrCreateUser = api.users.getOrCreate.useMutation()
 
   useEffect(() => {
-    // Check if user info is in localStorage
-    const storedUserId = localStorage.getItem("userId")
-    const storedUserName = localStorage.getItem("userName")
+    const initUser = async () => {
+      // Check if user info is in localStorage
+      const storedUserId = localStorage.getItem("userId")
+      const storedUserName = localStorage.getItem("userName")
 
-    if (storedUserId && storedUserName) {
-      setUserId(storedUserId)
-      setUserName(storedUserName)
-      setIsLoading(false)
-    } else {
-      setShowDialog(true)
-      setIsLoading(false)
+      if (storedUserId && storedUserName) {
+        setUserId(storedUserId)
+        setUserName(storedUserName)
+        setIsLoading(false)
+      } else {
+        // Create a temporary anonymous user if none exists
+        // This ensures we always have a userId
+        const tempName = `User-${Math.floor(Math.random() * 100000)}`
+        try {
+          const user = await getOrCreateUser.mutateAsync({ name: tempName })
+          
+          // Save to localStorage
+          localStorage.setItem("userId", user.id)
+          localStorage.setItem("userName", user.name)
+
+          setUserId(user.id)
+          setUserName(user.name)
+          setShowDialog(true) // Still show dialog to let user set a real name
+        } catch (error) {
+          console.error("Failed to create anonymous user:", error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
     }
+
+    initUser()
   }, [])
 
   const handleUserNameSubmit = async (name: string) => {
@@ -57,6 +77,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Failed to create user:", error)
     }
+  }
+
+  // Show loading indicator while initializing
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen">Initializing user...</div>
   }
 
   return (

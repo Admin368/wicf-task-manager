@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { router } from "@/lib/trpc/server";
-import { protectedProcedure } from "../middleware";
+import { router, publicProcedure } from "@/lib/trpc/server";
+import { protectedProcedure, withSupabase } from "../middleware";
 
 export const usersRouter = router({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -18,7 +18,7 @@ export const usersRouter = router({
     }
   }),
 
-  getOrCreate: protectedProcedure
+  getOrCreate: publicProcedure.use(withSupabase)
     .input(
       z.object({
         name: z.string().min(1),

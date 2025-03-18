@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { UserList } from "./user-list"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
-export function TaskList() {
+export function TaskList({ teamId, teamName }: { teamId: string; teamName: string }) {
   const { userId, userName } = useUser()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showTaskDialog, setShowTaskDialog] = useState(false)
@@ -23,12 +23,12 @@ export function TaskList() {
 
   const formattedDate = format(selectedDate, "yyyy-MM-dd")
 
-  // Fetch tasks and completions
+  // Fetch tasks and completions for the specific team
   const {
     data: tasks,
     isLoading: isLoadingTasks,
     error: tasksError,
-  } = api.tasks.getAll.useQuery(undefined, {
+  } = api.tasks.getByTeam.useQuery({ teamId }, {
     onError: (err) => {
       console.error("Error fetching tasks:", err)
       setError("Failed to load tasks. Please try refreshing the page.")
@@ -92,9 +92,10 @@ export function TaskList() {
       await createTask.mutateAsync({
         title: data.title,
         parentId: data.parentId,
+        teamId,
       })
 
-      utils.tasks.getAll.invalidate()
+      utils.tasks.getByTeam.invalidate({ teamId })
       setShowTaskDialog(false)
     } catch (error) {
       console.error("Failed to create task:", error)
@@ -112,7 +113,7 @@ export function TaskList() {
         parentId: data.parentId,
       })
 
-      utils.tasks.getAll.invalidate()
+      utils.tasks.getByTeam.invalidate({ teamId })
       setEditingTask(null)
     } catch (error) {
       console.error("Failed to update task:", error)
@@ -125,7 +126,7 @@ export function TaskList() {
     try {
       setError(null)
       await deleteTask.mutateAsync({ id: taskId })
-      utils.tasks.getAll.invalidate()
+      utils.tasks.getByTeam.invalidate({ teamId })
     } catch (error) {
       console.error("Failed to delete task:", error)
     }
@@ -153,7 +154,7 @@ export function TaskList() {
     <div className="container mx-auto py-6 max-w-4xl">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Team Task Tracker</h1>
+          <h1 className="text-2xl font-bold">{teamName}</h1>
           <div className="text-sm text-muted-foreground">Logged in as: {userName}</div>
         </div>
 
@@ -251,6 +252,7 @@ export function TaskList() {
           title={editingTask?.id ? "Edit Task" : "Add Task"}
           initialData={editingTask}
           tasks={tasks || []}
+          teamId={teamId}
         />
       )}
     </div>

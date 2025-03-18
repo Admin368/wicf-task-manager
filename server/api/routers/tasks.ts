@@ -3,11 +3,61 @@ import { router, publicProcedure } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 
 export const tasksRouter = router({
+  getByTeam: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        // First verify the user has access to this team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
+        const { data: tasks, error } = await ctx.supabase
+          .from("tasks")
+          .select("*")
+          .eq("team_id", input.teamId)
+          .order("position");
+
+        if (error) throw error;
+        return tasks || [];
+      } catch (error) {
+        console.error("Error fetching team tasks:", error);
+        return [];
+      }
+    }),
+
   getAll: protectedProcedure.query(async ({ ctx }) => {
     try {
+      // Get user's teams
+      const { data: memberships, error: membershipError } = await ctx.supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", ctx.userId);
+      
+      if (membershipError) throw membershipError;
+      
+      // If user is not in any teams, return empty array
+      if (!memberships || memberships.length === 0) {
+        return [];
+      }
+      
+      const teamIds = memberships.map(m => m.team_id);
+      
       const { data: tasks, error } = await ctx.supabase
         .from("tasks")
         .select("*")
+        .in("team_id", teamIds)
         .order("position");
 
       if (error) throw error;
@@ -23,11 +73,24 @@ export const tasksRouter = router({
       z.object({
         title: z.string().min(1),
         parentId: z.string().uuid().nullable(),
+        teamId: z.string().uuid(),
         position: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // Verify user has access to the team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
         // If position is not provided, get the max position for the parent and add 1
         let position = input.position;
         if (position === undefined) {
@@ -35,6 +98,7 @@ export const tasksRouter = router({
             .from("tasks")
             .select("position")
             .eq("parent_id", input.parentId)
+            .eq("team_id", input.teamId)
             .order("position", { ascending: false })
             .limit(1);
 
@@ -46,6 +110,7 @@ export const tasksRouter = router({
           .insert({
             title: input.title,
             parent_id: input.parentId,
+            team_id: input.teamId,
             position,
           })
           .select()
@@ -65,16 +130,39 @@ export const tasksRouter = router({
         id: z.string().uuid(),
         title: z.string().min(1).optional(),
         parentId: z.string().uuid().nullable().optional(),
+        teamId: z.string().uuid().optional(),
         position: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // Get current task to check team
+        const { data: task, error: taskError } = await ctx.supabase
+          .from("tasks")
+          .select("team_id")
+          .eq("id", input.id)
+          .single();
+        
+        if (taskError) throw taskError;
+        
+        // Verify user has access to the team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", task.team_id)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
         const { data, error } = await ctx.supabase
           .from("tasks")
           .update({
             ...(input.title && { title: input.title }),
             ...(input.parentId !== undefined && { parent_id: input.parentId }),
+            ...(input.teamId && { team_id: input.teamId }),
             ...(input.position !== undefined && { position: input.position }),
           })
           .eq("id", input.id)
@@ -97,6 +185,27 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // Get current task to check team
+        const { data: task, error: taskError } = await ctx.supabase
+          .from("tasks")
+          .select("team_id")
+          .eq("id", input.id)
+          .single();
+        
+        if (taskError) throw taskError;
+        
+        // Verify user has access to the team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", task.team_id)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
         // First, recursively delete all child tasks
         const deleteTaskAndChildren = async (taskId: string) => {
           // Get all children

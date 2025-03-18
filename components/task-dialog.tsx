@@ -33,6 +33,7 @@ interface TaskDialogProps {
     parent_id: string | null;
   };
   tasks: any[];
+  teamId: string;
 }
 
 export function TaskDialog({
@@ -42,6 +43,7 @@ export function TaskDialog({
   title,
   initialData,
   tasks,
+  teamId,
 }: TaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState(initialData?.title || "");
   const [parentId, setParentId] = useState<string | null>(

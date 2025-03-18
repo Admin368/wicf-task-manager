@@ -9,6 +9,7 @@ export interface Database {
           title: string
           parent_id: string | null
           position: number
+          team_id: string | null
           created_at: string
         }
         Insert: {
@@ -16,6 +17,7 @@ export interface Database {
           title: string
           parent_id?: string | null
           position?: number
+          team_id?: string | null
           created_at?: string
         }
         Update: {
@@ -23,6 +25,7 @@ export interface Database {
           title?: string
           parent_id?: string | null
           position?: number
+          team_id?: string | null
           created_at?: string
         }
       }
@@ -72,6 +75,49 @@ export interface Database {
           name?: string
           email?: string | null
           avatar_url?: string | null
+          created_at?: string
+        }
+      }
+      teams: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          password: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          password: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          password?: string
+          created_at?: string
+        }
+      }
+      team_members: {
+        Row: {
+          team_id: string
+          user_id: string
+          role: string
+          created_at: string
+        }
+        Insert: {
+          team_id: string
+          user_id: string
+          role?: string
+          created_at?: string
+        }
+        Update: {
+          team_id?: string
+          user_id?: string
+          role?: string
           created_at?: string
         }
       }
