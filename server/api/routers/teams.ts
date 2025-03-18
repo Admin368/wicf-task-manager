@@ -162,4 +162,43 @@ export const teamsRouter = router({
         return { hasAccess: false };
       }
     }),
+
+  delete: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // First verify the current user is an admin
+        const { data: currentUserRole, error: roleError } = await ctx.supabase
+          .from("team_members")
+          .select("role")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (roleError) throw new Error("Failed to verify user role");
+        if (
+          !currentUserRole ||
+          !["admin", "owner"].includes(currentUserRole.role)
+        ) {
+          throw new Error("You don't have permission to delete this team");
+        }
+
+        // Delete all team-related data in a transaction
+        console.log("Deleting team:", input.teamId);
+        const { error } = await ctx.supabase.rpc("delete_team", {
+          team_id: input.teamId,
+        });
+
+        if (error) throw error;
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error deleting team:", error);
+        throw error;
+      }
+    }),
 });

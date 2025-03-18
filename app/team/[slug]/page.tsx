@@ -4,14 +4,30 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TaskList } from "@/components/task-list";
 import { api } from "@/lib/trpc/client";
-import { Loader2, ExternalLink, Copy } from "lucide-react";
+import { Loader2, ExternalLink, Copy, Trash2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
-import { CheckInHistory } from "@/components/check-in-history";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/components/user-provider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import CheckInsPage from "./check-ins/page";
+
+type TeamMember = {
+  id: string;
+  role: string;
+};
 
 export default function TeamPage() {
   const params = useParams();
@@ -19,6 +35,7 @@ export default function TeamPage() {
   const slug = params?.slug as string;
   const [teamLoaded, setTeamLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
+  const { userId } = useUser();
 
   const { data: team, isLoading } = api.teams.getBySlug.useQuery(
     { slug },
@@ -65,6 +82,23 @@ export default function TeamPage() {
 
   const totalMembers = teamMembers?.length || 0;
 
+  const deleteTeam = api.teams.delete.useMutation({
+    onSuccess: () => {
+      toast({
+        title: "Team deleted",
+        description: "The team has been successfully deleted",
+      });
+      router.push("/");
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete team",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading || !teamLoaded) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -84,7 +118,6 @@ export default function TeamPage() {
         <div className="space-y-6">
           <CheckInButton teamId={team.id} />
           <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
-          {/* <CheckInHistory teamId={team.id} /> */}
 
           <Button
             variant="outline"
@@ -112,6 +145,39 @@ export default function TeamPage() {
             <ExternalLink className="h-4 w-4 mr-2" />
             View Full Check-in History
           </Button>
+
+          {teamMembers?.some(
+            (member: TeamMember) =>
+              member.role === "admin" && member.id === userId
+          ) && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Team
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete
+                    the team and remove all associated data including tasks and
+                    check-ins.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteTeam.mutate({ teamId: team.id })}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete Team
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         {/* Main content area */}
