@@ -3,9 +3,14 @@ import type { Database } from "@/types/supabase";
 
 // Create a single supabase client for server-side
 export const createServerSupabaseClient = () => {
-  const supabaseUrl =
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  const supabaseUrl = "https://gupxrxkeiwqtipzyrqnp.supabase.co";
+  const supabaseKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1cHhyeGtlaXdxdGlwenlycW5wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIxMDM3NzAsImV4cCI6MjA1NzY3OTc3MH0.oBRgtUdRV2eYgeP38XmyJwEVU0IyR9uX89VL5uFQF2c";
+
+  console.log({
+    supabaseUrl,
+    supabaseKey,
+  });
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Missing Supabase environment variables");
