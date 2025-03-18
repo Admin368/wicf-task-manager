@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TaskList } from "@/components/task-list";
 import { api } from "@/lib/trpc/client";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2, ExternalLink, Copy } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
@@ -85,6 +85,24 @@ export default function TeamPage() {
           <CheckInButton teamId={team.id} />
           <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
           {/* <CheckInHistory teamId={team.id} /> */}
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => {
+              const inviteLink = `${window.location.origin}/team/${slug}`;
+              const message = `🌟 Maravian Checklist 🌟\nA collaborative task manager with daily check-ins to keep your team in sync!\n\n👋 Join my team "${team.name}" on Maravian Checklist!\n\n📎 Team Link: ${inviteLink}\n🔑 Team Password: ${team.password}\n\nClick the link and use the password to join our team. Let's collaborate together!`;
+              navigator.clipboard.writeText(message);
+              toast({
+                title: "Invite Message Copied",
+                description:
+                  "Team invite message with password has been copied to your clipboard",
+              });
+            }}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copy Invite Message
+          </Button>
 
           <Button
             variant="outline"

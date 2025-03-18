@@ -18,7 +18,8 @@ export const teamsRouter = router({
     }
   }),
 
-  getBySlug: publicProcedure.use(withSupabase)
+  getBySlug: publicProcedure
+    .use(withSupabase)
     .input(
       z.object({
         slug: z.string(),
@@ -28,7 +29,7 @@ export const teamsRouter = router({
       try {
         const { data: team, error } = await ctx.supabase
           .from("teams")
-          .select("id, name, slug, created_at")
+          .select("id, name, slug, created_at, password")
           .eq("slug", input.slug)
           .single();
 
@@ -51,14 +52,14 @@ export const teamsRouter = router({
       try {
         // Generate slug from name
         let slug = slugify(input.name);
-        
+
         // Check if slug already exists
         const { data: existingTeam } = await ctx.supabase
           .from("teams")
           .select("id")
           .eq("slug", slug)
           .single();
-        
+
         // If slug exists, append a random number
         if (existingTeam) {
           slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
@@ -75,15 +76,13 @@ export const teamsRouter = router({
           .single();
 
         if (error) throw error;
-        
+
         // Add the creator as a team member with 'admin' role
-        await ctx.supabase
-          .from("team_members")
-          .insert({
-            team_id: data.id,
-            user_id: ctx.userId,
-            role: "admin",
-          });
+        await ctx.supabase.from("team_members").insert({
+          team_id: data.id,
+          user_id: ctx.userId,
+          role: "admin",
+        });
 
         return data;
       } catch (error) {
@@ -163,4 +162,4 @@ export const teamsRouter = router({
         return { hasAccess: false };
       }
     }),
-}); 
+});
