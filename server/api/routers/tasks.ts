@@ -53,7 +53,7 @@ export const tasksRouter = router({
         return [];
       }
       
-      const teamIds = memberships.map(m => m.team_id);
+      const teamIds = memberships.map((m: { team_id: string }) => m.team_id);
       
       const { data: tasks, error } = await ctx.supabase
         .from("tasks")
@@ -128,15 +128,61 @@ export const tasksRouter = router({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid(),
+        id: z.string().uuid().optional(),
         title: z.string().min(1).optional(),
         parentId: z.string().uuid().nullable().optional(),
         teamId: z.string().uuid().optional(),
         position: z.number().optional(),
+        updates: z.array(
+          z.object({
+            id: z.string().uuid(),
+            position: z.number(),
+          })
+        ).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        // If this is a batch update
+        if (input.updates) {
+          // Get the first task to check team access
+          const { data: task, error: taskError } = await ctx.supabase
+            .from("tasks")
+            .select("team_id")
+            .eq("id", input.updates[0].id)
+            .single();
+          
+          if (taskError) throw taskError;
+          
+          // Verify user has access to the team
+          const { data: membership, error: membershipError } = await ctx.supabase
+            .from("team_members")
+            .select("*")
+            .eq("team_id", task.team_id)
+            .eq("user_id", ctx.userId)
+            .single();
+
+          if (membershipError || !membership) {
+            throw new Error("You don't have access to this team");
+          }
+
+          // Update positions in a transaction
+          const { error } = await ctx.supabase.rpc('update_task_positions', {
+            position_updates: input.updates.map(update => ({
+              task_id: update.id,
+              new_position: update.position,
+            }))
+          });
+
+          if (error) throw error;
+          return { success: true };
+        }
+
+        // Regular single task update
+        if (!input.id) {
+          throw new Error("Task ID is required for single task update");
+        }
+
         // Get current task to check team
         const { data: task, error: taskError } = await ctx.supabase
           .from("tasks")
@@ -231,6 +277,48 @@ export const tasksRouter = router({
         return { success: true };
       } catch (error) {
         console.error("Error deleting task:", error);
+        throw error;
+      }
+    }),
+
+  updatePositions: protectedProcedure
+    .input(
+      z.object({
+        updates: z.array(
+          z.object({
+            id: z.string().uuid(),
+            position: z.number(),
+          })
+        ),
+        teamId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Verify user has access to the team
+        const { data: membership, error: membershipError } = await ctx.supabase
+          .from("team_members")
+          .select("*")
+          .eq("team_id", input.teamId)
+          .eq("user_id", ctx.userId)
+          .single();
+
+        if (membershipError || !membership) {
+          throw new Error("You don't have access to this team");
+        }
+
+        // Update positions in a transaction
+        const { error } = await ctx.supabase.rpc('update_task_positions', {
+          position_updates: input.updates.map(update => ({
+            task_id: update.id,
+            new_position: update.position,
+          }))
+        });
+
+        if (error) throw error;
+        return { success: true };
+      } catch (error) {
+        console.error("Error updating task positions:", error);
         throw error;
       }
     }),

@@ -12,6 +12,7 @@ import { useUser } from "./user-provider"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserList } from "./user-list"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import type { Task } from "@/types/task"
 
 export function TaskList({ teamId, teamName }: { teamId: string; teamName: string }) {
   const { userId, userName } = useUser()
@@ -94,7 +95,7 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
   const utils = api.useContext()
 
   // Get top-level tasks
-  const topLevelTasks = tasks?.filter((task) => task.parent_id === null).sort((a, b) => a.position - b.position) || []
+  const topLevelTasks = tasks?.filter((task: Task) => task.parent_id === null).sort((a: Task, b: Task) => a.position - b.position) || []
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date)
@@ -148,7 +149,7 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
 
   const handleAddSubtask = (parentId: string) => {
     // Find the parent task
-    const parentTask = tasks?.find((t) => t.id === parentId)
+    const parentTask = tasks?.find((t: Task) => t.id === parentId)
     if (parentTask) {
       // Set the initial data with parent_id
       setEditingTask({ parent_id: parentId })
@@ -160,12 +161,74 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
     setError(null)
   }
 
+  const handleMoveTask = async (taskId: string, direction: 'up' | 'down') => {
+    try {
+      // Find the task and its siblings
+      const task = tasks?.find((t: Task) => t.id === taskId)
+      if (!task) return
+
+      const siblingTasks = tasks
+        ?.filter((t: Task) => t.parent_id === task.parent_id)
+        .sort((a: Task, b: Task) => a.position - b.position)
+
+      const currentIndex = siblingTasks.findIndex((t: Task) => t.id === taskId)
+      if (currentIndex === -1) return
+
+      // Calculate new index
+      const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+      if (newIndex < 0 || newIndex >= siblingTasks.length) return
+
+      // Create a new array with the updated order
+      const newTasks = [...siblingTasks]
+      const [movedTask] = newTasks.splice(currentIndex, 1)
+      newTasks.splice(newIndex, 0, movedTask)
+
+      // Calculate new positions for all affected tasks
+      const updates = newTasks.map((task: Task, index: number) => ({
+        id: task.id,
+        position: calculateNewPosition(index, index, newTasks),
+      }))
+
+      // Update task positions in batch
+      await updateTask.mutateAsync({
+        updates,
+        teamId,
+      })
+
+      // Invalidate tasks query to refresh the list
+      utils.tasks.getByTeam.invalidate({ teamId })
+    } catch (error) {
+      console.error("Error moving task:", error)
+      setError("Failed to move task. Please try again.")
+    }
+  }
+
+  const calculateNewPosition = (oldIndex: number, newIndex: number, tasks: Task[]) => {
+    if (tasks.length === 0) return 0
+    if (tasks.length === 1) return tasks[0].position
+
+    // If moving to start
+    if (newIndex === 0) {
+      return Math.max(0, tasks[0].position - 1000)
+    }
+
+    // If moving to end
+    if (newIndex === tasks.length - 1) {
+      return tasks[tasks.length - 1].position + 1000
+    }
+
+    // Moving between two tasks - ensure integer result
+    const beforePosition = tasks[newIndex - 1].position
+    const afterPosition = tasks[newIndex].position
+    return Math.floor(beforePosition + (afterPosition - beforePosition) / 2)
+  }
+
   if (!userId) {
     return <div className="flex justify-center items-center h-screen">Loading user...</div>
   }
 
   return (
-    <div className="">
+    <div className="flex-1 overflow-hidden">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">{teamName}</h1>
@@ -253,24 +316,34 @@ export function TaskList({ teamId, teamName }: { teamId: string; teamName: strin
                 <p>No tasks found. Add your first task to get started.</p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {topLevelTasks.map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    tasks={tasks || []}
-                    completions={completions || []}
-                    selectedDate={formattedDate}
-                    onAddSubtask={handleAddSubtask}
-                    onEditTask={(task) => {
-                      setEditingTask(task)
-                      setShowTaskDialog(true)
-                    }}
-                    onDeleteTask={handleDeleteTask}
-                    refetchCompletions={refetchCompletions}
-                    teamMembers={teamMembers || []}
-                  />
-                ))}
+              <div className="flex-1 overflow-y-auto p-4">
+                {error && (
+                  <div className="mb-4 text-sm text-red-500">{error}</div>
+                )}
+
+                {isLoadingTasks || isLoadingCompletions ? (
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div>
+                    {topLevelTasks.map((task: Task) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        tasks={tasks}
+                        completions={completions || []}
+                        teamMembers={teamMembers || []}
+                        selectedDate={selectedDate.toISOString().split("T")[0]}
+                        onAddSubtask={handleAddSubtask}
+                        onEditTask={handleEditTask}
+                        onDeleteTask={handleDeleteTask}
+                        onMoveTask={handleMoveTask}
+                        refetchCompletions={refetchCompletions}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

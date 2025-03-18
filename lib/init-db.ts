@@ -14,7 +14,8 @@ export async function initDatabase() {
 
     // Create tables if they don't exist
     if (!tables.includes("tasks")) {
-      await supabase.query(`
+      await supabase.rpc('exec', {
+        query: `
         CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
         -- Teams table
@@ -85,14 +86,30 @@ export async function initDatabase() {
         CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(position);
         CREATE INDEX IF NOT EXISTS idx_completions_user_date ON completions(user_id, completed_date);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_completion ON completions(task_id, user_id, completed_date);
-      `)
+
+        -- Create stored procedure for updating task positions
+        CREATE OR REPLACE FUNCTION update_task_positions(position_updates jsonb)
+        RETURNS void AS $$
+        DECLARE
+          task_update record;
+        BEGIN
+          FOR task_update IN 
+            SELECT * FROM jsonb_to_recordset(position_updates) AS x(task_id uuid, new_position int)
+          LOOP
+            UPDATE tasks
+            SET position = task_update.new_position
+            WHERE id = task_update.task_id;
+          END LOOP;
+        END;
+        $$ LANGUAGE plpgsql;
+      `});
     }
 
     console.log("Database initialized successfully")
     return true
   } catch (error) {
     console.error("Error initializing database:", error)
-    return false
+    throw error
   }
 }
 
