@@ -124,6 +124,7 @@ export function TaskItem({
       // Optimistically update UI
       setIsCompleted(checked)
 
+      // Call the API to update the task status
       await toggleCompletion.mutateAsync({
         taskId: task.id,
         userId,
@@ -136,6 +137,15 @@ export function TaskItem({
     } catch (error) {
       console.error("Failed to toggle completion:", error)
       // UI will be reverted by the onError handler in the mutation
+      
+      // Display the error message from the server if available
+      if (error instanceof Error) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to update task status. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
