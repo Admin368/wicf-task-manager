@@ -34,9 +34,9 @@ import { api } from "@/lib/trpc/client";
 interface TeamMember {
   id: string;
   name: string;
-  email?: string | null;
-  avatar_url?: string | null;
-  role: string;
+  email: string | null;
+  avatarUrl: string | null;
+  role: string | null;
   notes?: string | null;
   checkedInAt?: string | null;
 }
@@ -60,6 +60,7 @@ export function UserList({
   const isAdmin = teamMembers?.find(
     (member) =>
       member.id === userId &&
+      member.role &&
       (member.role === "admin" || member.role === "owner")
   );
 
@@ -109,7 +110,8 @@ export function UserList({
     }
   };
 
-  const getRoleColor = (role: string) => {
+  const getRoleColor = (role: string | null) => {
+    if (!role) return "bg-secondary text-secondary-foreground";
     switch (role.toLowerCase()) {
       case "admin":
         return "bg-primary text-primary-foreground";
@@ -120,7 +122,8 @@ export function UserList({
     }
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: string | null) => {
+    if (!role) return <User className="h-3 w-3 mr-1" />;
     switch (role.toLowerCase()) {
       case "admin":
       case "owner":
@@ -155,13 +158,17 @@ export function UserList({
               className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group"
             >
               <Avatar>
-                <AvatarFallback>
-                  {member.name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
+                {member.avatarUrl ? (
+                  <img src={member.avatarUrl} alt={member.name} />
+                ) : (
+                  <AvatarFallback>
+                    {member.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .toUpperCase()}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div className="flex-grow">
                 <div className="font-medium">
@@ -183,18 +190,16 @@ export function UserList({
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex flex-col items-end gap-2">
-                  {member.role && (
-                    <Badge
-                      variant="secondary"
-                      className={`flex items-center ${getRoleColor(
-                        member.role
-                      )}`}
-                    >
-                      {getRoleIcon(member.role)}
-                      {member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)}
-                    </Badge>
-                  )}
+                  <Badge
+                    variant="secondary"
+                    className={`flex items-center ${getRoleColor(member.role)}`}
+                  >
+                    {getRoleIcon(member.role)}
+                    {member.role
+                      ? member.role.charAt(0).toUpperCase() +
+                        member.role.slice(1)
+                      : "Member"}
+                  </Badge>
                   {showTime && member.checkedInAt && (
                     <Badge
                       variant="outline"
@@ -223,6 +228,7 @@ export function UserList({
                     </DropdownMenuItem>
 
                     {isAdmin &&
+                      member.role &&
                       member.role !== "owner" &&
                       teamId &&
                       (member.role === "admin" ? (

@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { router, publicProcedure } from "@/lib/trpc/server";
+import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 
 export const tasksRouter = router({
-  getByTeam: publicProcedure
+  getByTeam: protectedProcedure
     .input(
       z.object({
         teamId: z.string().uuid(),
@@ -13,13 +13,6 @@ export const tasksRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        if (!ctx.userId) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You must be logged in",
-          });
-        }
-
         // First verify the user has access to this team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
@@ -37,12 +30,15 @@ export const tasksRouter = router({
           });
         }
 
-        const tasks = await ctx.prisma.$queryRaw`
-          SELECT * FROM tasks 
-          WHERE team_id = ${input.teamId}
-          AND is_deleted = false 
-          ORDER BY position ASC
-        `;
+        const tasks = await ctx.prisma.task.findMany({
+          where: {
+            teamId: input.teamId,
+            isDeleted: false,
+          },
+          orderBy: {
+            position: "asc",
+          },
+        });
 
         return tasks;
       } catch (error) {
@@ -52,12 +48,8 @@ export const tasksRouter = router({
       }
     }),
 
-  getAll: publicProcedure.query(async ({ ctx }) => {
+  getAll: protectedProcedure.query(async ({ ctx }) => {
     try {
-      if (!ctx.userId) {
-        return [];
-      }
-
       // Get user's teams
       const memberships = await ctx.prisma.teamMember.findMany({
         where: { userId: ctx.userId },
@@ -70,12 +62,17 @@ export const tasksRouter = router({
 
       const teamIds = memberships.map((m) => m.teamId);
 
-      const tasks = await ctx.prisma.$queryRaw`
-        SELECT * FROM tasks 
-        WHERE team_id = ANY(${teamIds}::uuid[])
-        AND is_deleted = false 
-        ORDER BY position ASC
-      `;
+      const tasks = await ctx.prisma.task.findMany({
+        where: {
+          teamId: {
+            in: teamIds,
+          },
+          isDeleted: false,
+        },
+        orderBy: {
+          position: "asc",
+        },
+      });
 
       return tasks;
     } catch (error) {
@@ -84,7 +81,7 @@ export const tasksRouter = router({
     }
   }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1),
@@ -95,13 +92,6 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        if (!ctx.userId) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You must be logged in",
-          });
-        }
-
         // Verify user has access to the team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
@@ -122,16 +112,18 @@ export const tasksRouter = router({
         // If position is not provided, get the max position for the parent and add 1
         let position = input.position;
         if (position === undefined) {
-          const lastTask = await ctx.prisma.$queryRaw<{ position: number }[]>`
-            SELECT position FROM tasks 
-            WHERE parent_id = ${input.parentId}
-            AND team_id = ${input.teamId}
-            AND is_deleted = false 
-            ORDER BY position DESC 
-            LIMIT 1
-          `;
+          const lastTask = await ctx.prisma.task.findFirst({
+            where: {
+              parentId: input.parentId,
+              teamId: input.teamId,
+              isDeleted: false,
+            },
+            orderBy: {
+              position: "desc",
+            },
+          });
 
-          position = lastTask.length > 0 ? lastTask[0].position + 1 : 0;
+          position = lastTask ? lastTask.position + 1 : 0;
         }
 
         const task = await ctx.prisma.task.create({
@@ -151,7 +143,7 @@ export const tasksRouter = router({
       }
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid().optional(),
@@ -171,13 +163,6 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        if (!ctx.userId) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You must be logged in",
-          });
-        }
-
         // If this is a batch update
         if (input.updates) {
           // Get the first task to check team access
@@ -279,7 +264,7 @@ export const tasksRouter = router({
       }
     }),
 
-  delete: publicProcedure
+  delete: protectedProcedure
     .input(
       z.object({
         id: z.string().uuid(),
@@ -287,13 +272,6 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        if (!ctx.userId) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "You must be logged in",
-          });
-        }
-
         // Get current task to check team
         const task = await ctx.prisma.task.findUnique({
           where: { id: input.id },
@@ -315,9 +293,16 @@ export const tasksRouter = router({
               userId: ctx.userId,
             },
           },
+          select: {
+            role: true,
+          },
         });
 
-        if (!membership || !["admin", "owner"].includes(membership.role)) {
+        if (
+          !membership ||
+          !membership.role ||
+          !["admin", "owner"].includes(membership.role)
+        ) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "You don't have permission to delete tasks",
@@ -325,16 +310,18 @@ export const tasksRouter = router({
         }
 
         const softDeleteTaskAndChildren = async (taskId: string) => {
+          // Get all descendant tasks
           const children = await ctx.prisma.task.findMany({
             where: { parentId: taskId },
           });
 
-          await ctx.prisma.$executeRaw`
-            UPDATE tasks 
-            SET is_deleted = true 
-            WHERE id = ${taskId}::uuid
-          `;
+          // Soft delete the current task
+          await ctx.prisma.task.update({
+            where: { id: taskId },
+            data: { isDeleted: true },
+          });
 
+          // Recursively soft delete all children
           for (const child of children) {
             await softDeleteTaskAndChildren(child.id);
           }

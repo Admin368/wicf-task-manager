@@ -16,12 +16,12 @@ import { api } from "@/lib/trpc/client";
 import { Loader2, Lock, Plus, Search } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useUser } from "./user-provider";
-type Team = {
+
+type APITeam = {
   id: string;
   name: string;
   slug: string;
-  created_at: string;
-  isDeleted: boolean;
+  createdAt: Date | null;
 };
 
 export function TeamsList() {
@@ -34,15 +34,13 @@ export function TeamsList() {
   const { data: teams, isLoading } = api.teams.getAll.useQuery();
 
   // Filter teams based on search query
-  const filteredTeams = teams?.filter(
-    (team: Team) =>
-      !team.isDeleted &&
-      team.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTeams = teams?.filter((team: APITeam) =>
+    team.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const joinTeam = api.teams.join.useMutation({
     onSuccess: (data, variables) => {
-      const team = teams?.find((t: Team) => t.id === variables.teamId);
+      const team = teams?.find((t: APITeam) => t.id === variables.teamId);
       if (team) {
         toast({
           title: "Team joined",
@@ -60,7 +58,7 @@ export function TeamsList() {
     },
   });
 
-  const handleJoinTeam = async (team: Team) => {
+  const handleJoinTeam = async (team: APITeam) => {
     try {
       setJoiningTeam(team.id);
       await joinTeam.mutateAsync({
@@ -143,12 +141,16 @@ export function TeamsList() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTeams.map((team: Team) => (
+          {filteredTeams.map((team: APITeam) => (
             <Card key={team.id}>
               <CardHeader>
                 <CardTitle>{team.name}</CardTitle>
+                <CardDescription>@{team.slug}</CardDescription>
                 <CardDescription>
-                  Created on {new Date(team.created_at).toLocaleDateString()}
+                  Created on{" "}
+                  {team.createdAt
+                    ? new Date(team.createdAt).toLocaleDateString()
+                    : "N/A"}
                 </CardDescription>
               </CardHeader>
               <CardContent>

@@ -5,18 +5,33 @@ import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 import type { Context } from "@/lib/trpc/server";
 
+// Helper function to convert date string to ISO DateTime
+function toISODateTime(dateStr: string) {
+  const date = new Date(dateStr);
+  // Set to start of day in local timezone
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 // Define input schemas
 const getByDateSchema = z.object({
   taskId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
 });
 
-const toggleSchema = z.object({
-  taskId: z.string().uuid(),
+const getAllByDateSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
 });
 
+const toggleSchema = z.object({
+  userId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+  completed: z.boolean(),
+});
+
 type GetByDateInput = z.infer<typeof getByDateSchema>;
+type GetAllByDateInput = z.infer<typeof getAllByDateSchema>;
 type ToggleInput = z.infer<typeof toggleSchema>;
 
 export const completionsRouter = router({
@@ -28,7 +43,7 @@ export const completionsRouter = router({
         const task = await prisma.task.findFirst({
           where: {
             id: input.taskId,
-            deletedAt: null,
+            isDeleted: false,
           },
           include: {
             team: {
@@ -58,12 +73,14 @@ export const completionsRouter = router({
         }
 
         // Get completion status
-        const completion = await prisma.taskCompletion.findUnique({
+        const completion = await prisma.taskCompletion.findFirst({
           where: {
-            taskId_userId_completionDate: {
-              taskId: input.taskId,
-              userId: ctx.userId!,
-              completionDate: input.date,
+            taskId: input.taskId,
+            completionDate: toISODateTime(input.date),
+            task: {
+              team: {
+                id: task.team.id,
+              },
             },
           },
         });
@@ -79,22 +96,86 @@ export const completionsRouter = router({
       }
     }),
 
+  getAllByDate: protectedProcedure
+    .input(getAllByDateSchema)
+    .query(
+      async ({ ctx, input }: { ctx: Context; input: GetAllByDateInput }) => {
+        try {
+          if (!ctx.userId) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "You must be logged in to view completions",
+            });
+          }
+
+          // Get all completions for the user on the specified date
+          const completions = await prisma.taskCompletion.findMany({
+            where: {
+              completionDate: toISODateTime(input.date),
+              task: {
+                team: {
+                  members: {
+                    some: {
+                      userId: ctx.userId,
+                    },
+                  },
+                },
+                isDeleted: false,
+              },
+            },
+            include: {
+              task: {
+                include: {
+                  team: {
+                    include: {
+                      members: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              user: true,
+            },
+          });
+
+          return completions;
+        } catch (error) {
+          console.error("Error fetching completions:", error);
+          if (error instanceof TRPCError) throw error;
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to fetch completions",
+          });
+        }
+      }
+    ),
+
   toggle: protectedProcedure
     .input(toggleSchema)
     .mutation(async ({ ctx, input }: { ctx: Context; input: ToggleInput }) => {
       try {
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in to complete tasks",
+          });
+        }
+
         // First verify the user has access to this task
         const task = await prisma.task.findFirst({
           where: {
             id: input.taskId,
-            deletedAt: null,
+            isDeleted: false,
           },
           include: {
             team: {
               include: {
                 members: {
                   where: {
-                    userId: ctx.userId!,
+                    userId: ctx.userId,
                   },
                 },
               },
@@ -109,7 +190,7 @@ export const completionsRouter = router({
           });
         }
 
-        if (!task.team?.members.length) {
+        if (!task.team?.members || task.team.members.length === 0) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "You don't have access to this task",
@@ -117,30 +198,32 @@ export const completionsRouter = router({
         }
 
         // Check if the user has checked in for the day
-        const checkIn = await prisma.checkIn.findUnique({
-          where: {
-            teamId_userId_checkInDate: {
-              teamId: task.team.id,
-              userId: ctx.userId!,
-              checkInDate: input.date,
-            },
-          },
-        });
+        // const checkIn = await prisma.checkIn.findFirst({
+        //   where: {
+        //     teamId: task.team.id,
+        //     userId: ctx.userId,
+        //     checkInDate: {
+        //       equals: input.date,
+        //     },
+        //   },
+        // });
 
-        if (!checkIn) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "You must check in before completing tasks",
-          });
-        }
+        // if (!checkIn) {
+        //   throw new TRPCError({
+        //     code: "BAD_REQUEST",
+        //     message: "You must check in before completing tasks",
+        //   });
+        // }
 
         // Get existing completion
-        const existingCompletion = await prisma.taskCompletion.findUnique({
+        const existingCompletion = await prisma.taskCompletion.findFirst({
           where: {
-            taskId_userId_completionDate: {
-              taskId: input.taskId,
-              userId: ctx.userId!,
-              completionDate: input.date,
+            taskId: input.taskId,
+            completionDate: toISODateTime(input.date),
+            task: {
+              team: {
+                id: task.team.id,
+              },
             },
           },
         });
@@ -155,7 +238,7 @@ export const completionsRouter = router({
 
           return {
             success: true,
-            message: "Task marked as incomplete",
+            message: "Task marked as incomplete for the team",
             completed: false,
           };
         } else {
@@ -163,21 +246,25 @@ export const completionsRouter = router({
           const completion = await prisma.taskCompletion.create({
             data: {
               taskId: input.taskId,
-              userId: ctx.userId!,
-              completionDate: input.date,
+              userId: ctx.userId,
+              completionDate: toISODateTime(input.date),
             },
           });
 
           return {
             success: true,
-            message: "Task marked as complete",
+            message: "Task marked as complete for the team",
             completed: true,
             completion,
           };
         }
       } catch (error) {
         console.error("Error toggling completion:", error);
-        throw error;
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to toggle task completion",
+        });
       }
     }),
 });

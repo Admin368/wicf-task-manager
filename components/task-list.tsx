@@ -12,7 +12,7 @@ import { useUser } from "./user-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { Task } from "@/types/task";
+import type { Task, TeamMember } from "@prisma/client";
 
 export function TaskList({
   teamId,
@@ -28,7 +28,7 @@ export function TaskList({
   const [editingTask, setEditingTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const formattedDate = format(selectedDate, "yyyy-MM-dd");
+  const formattedDate = selectedDate.toISOString().split("T")[0];
 
   // Fetch tasks and completions for the specific team
   const {
@@ -50,10 +50,11 @@ export function TaskList({
     isLoading: isLoadingCompletions,
     error: completionsError,
     refetch: refetchCompletions,
-  } = api.completions.getByDate.useQuery(
+  } = api.completions.getAllByDate.useQuery(
     { date: formattedDate },
     {
-      refetchInterval: 10000,
+      refetchInterval: 5000,
+      refetchOnWindowFocus: true,
       onError: (err) => {
         console.error("Error fetching completions:", err);
         setError(
@@ -107,7 +108,7 @@ export function TaskList({
   // Get top-level tasks
   const topLevelTasks =
     tasks
-      ?.filter((task: Task) => task.parent_id === null)
+      ?.filter((task: Task) => task.parentId === null)
       .sort((a: Task, b: Task) => a.position - b.position) || [];
 
   const handleDateChange = (date: Date) => {
@@ -175,8 +176,8 @@ export function TaskList({
     // Find the parent task
     const parentTask = tasks?.find((t: Task) => t.id === parentId);
     if (parentTask) {
-      // Set the initial data with parent_id
-      setEditingTask({ parent_id: parentId });
+      // Set the initial data with parentId
+      setEditingTask({ parentId });
       setShowTaskDialog(true);
     }
   };
@@ -192,8 +193,10 @@ export function TaskList({
       if (!task) return;
 
       const siblingTasks = tasks
-        ?.filter((t: Task) => t.parent_id === task.parent_id)
+        ?.filter((t: Task) => t.parentId === task.parentId)
         .sort((a: Task, b: Task) => a.position - b.position);
+
+      if (!siblingTasks) return;
 
       const currentIndex = siblingTasks.findIndex((t: Task) => t.id === taskId);
       if (currentIndex === -1) return;
@@ -251,10 +254,39 @@ export function TaskList({
     return Math.floor(beforePosition + (afterPosition - beforePosition) / 2);
   };
 
+  const renderTasks = (tasks: Task[], level = 0) => {
+    return tasks.map((task) => (
+      <TaskItem
+        key={task.id}
+        task={task}
+        tasks={tasks}
+        completions={completions || []}
+        teamMembers={teamMembers || []}
+        selectedDate={formattedDate}
+        level={level}
+        onAddSubtask={handleAddSubtask}
+        onEditTask={setEditingTask}
+        onDeleteTask={handleDeleteTask}
+        onMoveTask={handleMoveTask}
+        refetchCompletions={refetchCompletions}
+      />
+    ));
+  };
+
   if (!userId) {
     return (
       <div className="flex justify-center items-center h-screen">
         Loading user...
+      </div>
+    );
+  }
+
+  if (isLoadingTasks || isLoadingCompletions || isLoadingMembers) {
+    return (
+      <div className="space-y-2">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
       </div>
     );
   }

@@ -68,11 +68,12 @@ export function TaskItem({
   const isAdmin = teamMembers?.find(
     (member) =>
       member.id === userId &&
+      member.role &&
       (member.role === "admin" || member.role === "owner")
   );
 
   const toggleCompletion = api.completions.toggle.useMutation({
-    onError: (error: Error) => {
+    onError: (error) => {
       console.error("Failed to toggle completion:", error);
       toast({
         title: "Error",
@@ -103,15 +104,18 @@ export function TaskItem({
 
   // Check if task is completed and who completed it
   useEffect(() => {
-    if (!userId) return;
+    if (!completions || !teamMembers) return;
 
-    const completion = completions.find(
-      (c) => c.taskId === task.id && c.completedDate === selectedDate
-    );
+    const completion = completions.find((c) => c.taskId === task.id);
 
-    setIsCompleted(!!completion);
-    setCompletedBy(completion?.completedById || null);
-  }, [completions, task.id, userId, selectedDate]);
+    if (completion) {
+      setIsCompleted(true);
+      setCompletedBy(completion.userId);
+    } else {
+      setIsCompleted(false);
+      setCompletedBy(null);
+    }
+  }, [completions, task.id, teamMembers, selectedDate]);
 
   const handleCheckboxChange = async (checked: boolean | "indeterminate") => {
     if (!userId || typeof checked !== "boolean") return;
@@ -125,11 +129,16 @@ export function TaskItem({
     try {
       // Optimistically update UI
       setIsCompleted(checked);
+      if (checked) {
+        setCompletedBy(userId);
+      } else {
+        setCompletedBy(null);
+      }
 
       // Call the API to update the task status
       await toggleCompletion.mutateAsync({
         taskId: task.id,
-        userId: userId || "", // Ensure userId is a string
+        userId: userId!,
         date: selectedDate,
         completed: checked,
       });
@@ -138,9 +147,11 @@ export function TaskItem({
       refetchCompletions?.();
     } catch (error) {
       console.error("Failed to toggle completion:", error);
-      // UI will be reverted by the onError handler in the mutation
+      // Reset UI state
+      setIsCompleted(!checked);
+      setCompletedBy(checked ? null : userId);
 
-      // Display the error message from the server if available
+      // Display the error message
       if (error instanceof Error) {
         toast({
           title: "Error",
@@ -205,32 +216,12 @@ export function TaskItem({
             {completedBy && (
               <span className="text-sm text-muted-foreground">
                 Completed by{" "}
-                {teamMembers.find((m) => m.id === completedBy)?.name}
+                {teamMembers.find((m) => m.userId === completedBy)?.user?.name}
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-1">
-            {!isFirst && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onMoveTask?.(task.id, "up")}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
-            )}
-            {!isLast && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onMoveTask?.(task.id, "down")}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="icon"
@@ -255,6 +246,26 @@ export function TaskItem({
                 onClick={() => onDeleteTask?.(task.id)}
               >
                 <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            {!isFirst && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onMoveTask?.(task.id, "up")}
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+            )}
+            {!isLast && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onMoveTask?.(task.id, "down")}
+              >
+                <ArrowDown className="h-4 w-4" />
               </Button>
             )}
           </div>

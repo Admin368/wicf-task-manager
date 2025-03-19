@@ -55,6 +55,7 @@ export function SortableTaskItem({
   const isAdmin = teamMembers?.find(
     (member) =>
       member.id === userId &&
+      member.role &&
       (member.role === "admin" || member.role === "owner")
   );
 

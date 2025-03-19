@@ -11,6 +11,7 @@ import { CheckInStatusBar } from "@/components/check-in-status-bar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/components/user-provider";
+import type { TeamMember } from "@prisma/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,11 +24,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import CheckInsPage from "./check-ins/page";
-
-type TeamMember = {
-  id: string;
-  role: string;
-};
 
 export default function TeamPage() {
   const params = useParams();
@@ -148,7 +144,7 @@ export default function TeamPage() {
 
           {teamMembers?.some(
             (member: TeamMember) =>
-              member.role === "admin" && member.id === userId
+              member.role && member.role === "admin" && member.id === userId
           ) && (
             <AlertDialog>
               <AlertDialogTrigger asChild>

@@ -71,7 +71,7 @@ export function Header() {
             </DropdownMenu>
           ) : (
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/api/auth/signin">Sign In</Link>
+              <Link href="/login">Sign In</Link>
             </Button>
           )}
         </div>

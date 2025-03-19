@@ -4,10 +4,17 @@ import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 
+// Helper function to convert date string to ISO DateTime
+function toISODateTime(dateStr: string) {
+  const date = new Date(dateStr);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
 // Define input schemas
 const getByTeamAndDateSchema = z.object({
   teamId: z.string().uuid(),
-  date: z.date(), // YYYY-MM-DD format
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
 });
 
 const getHistorySchema = z.object({
@@ -17,12 +24,12 @@ const getHistorySchema = z.object({
 
 const getUserCheckInStatusSchema = z.object({
   teamId: z.string().uuid(),
-  date: z.date(), // YYYY-MM-DD format
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
 });
 
 const checkInSchema = z.object({
   teamId: z.string().uuid(),
-  date: z.date(), // YYYY-MM-DD format
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
   notes: z.string().optional(),
 });
 
@@ -52,7 +59,7 @@ export const checkInsRouter = router({
         const checkIns = await prisma.checkIn.findMany({
           where: {
             teamId: input.teamId,
-            checkInDate: input.date,
+            checkInDate: toISODateTime(input.date),
           },
           include: {
             user: {
@@ -129,12 +136,30 @@ export const checkInsRouter = router({
     .input(getUserCheckInStatusSchema)
     .query(async ({ ctx, input }) => {
       try {
+        // First verify the user has access to this team
+        const membership = await prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
+
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
+        }
+
+        // Check if the user has checked in for the day
         const checkIn = await prisma.checkIn.findUnique({
           where: {
             teamId_userId_checkInDate: {
               teamId: input.teamId,
               userId: ctx.userId!,
-              checkInDate: input.date,
+              checkInDate: toISODateTime(input.date),
             },
           },
         });
@@ -144,7 +169,8 @@ export const checkInsRouter = router({
           checkInDetails: checkIn,
         };
       } catch (error) {
-        console.error("Error fetching user check-in status:", error);
+        console.error("Error fetching check-in status:", error);
+        if (error instanceof TRPCError) throw error;
         return { checkedIn: false, checkInDetails: null };
       }
     }),
@@ -170,39 +196,19 @@ export const checkInsRouter = router({
           });
         }
 
-        // Check if the user already checked in today
-        const existingCheckIn = await prisma.checkIn.findUnique({
-          where: {
-            teamId_userId_checkInDate: {
-              teamId: input.teamId,
-              userId: ctx.userId!,
-              checkInDate: input.date,
-            },
-          },
-        });
-
-        if (existingCheckIn) {
-          return {
-            success: true,
-            message: "Already checked in",
-            alreadyCheckedIn: true,
-          };
-        }
-
-        // Create the check-in record
+        // Create the check-in
         const checkIn = await prisma.checkIn.create({
           data: {
             teamId: input.teamId,
             userId: ctx.userId!,
-            checkInDate: input.date,
-            notes: input.notes || null,
+            checkInDate: toISODateTime(input.date),
+            notes: input.notes,
           },
         });
 
         return {
           success: true,
           message: "Successfully checked in",
-          alreadyCheckedIn: false,
           checkIn,
         };
       } catch (error) {

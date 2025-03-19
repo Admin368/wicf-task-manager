@@ -18,7 +18,7 @@ export const usersRouter = router({
     }
   }),
 
-  getTeamMembers: publicProcedure
+  getTeamMembers: protectedProcedure
     .input(
       z.object({
         teamId: z.string().uuid(),
@@ -31,7 +31,7 @@ export const usersRouter = router({
           where: {
             teamId_userId: {
               teamId: input.teamId,
-              userId: ctx.userId ?? "",
+              userId: ctx.userId,
             },
           },
         });
@@ -60,17 +60,14 @@ export const usersRouter = router({
           },
         });
 
-        return members.map((member) => ({
-          id: member.userId,
-          role: member.role,
-          name: member.user.name,
-          email: member.user.email,
-          avatarUrl: member.user.avatarUrl,
-        }));
+        return members;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error("Error fetching team members:", error);
-        return [];
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch team members",
+        });
       }
     }),
 

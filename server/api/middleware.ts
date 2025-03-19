@@ -5,7 +5,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 const isAuthed = middleware(async (opts) => {
   const session = await getServerSession(authOptions);
-  console.log("session", session);
+  // console.log("session", session);
   if (!session?.user?.id) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
