@@ -18,7 +18,7 @@
   - if copied link no access but logged in, ask popup enter password to get access and continue to team {cm:2025-03-20}
   - footer {cm:2025-03-20}
   - on arrived on no accessed team enter password to join {cm:2025-03-20}
-  - /account reform
+  - /account reform {cm:2025-03-20}
   - forgot password functionality
   - Delete functionality
     - teams

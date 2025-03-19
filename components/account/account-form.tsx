@@ -97,6 +97,7 @@ export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
     handleSubmit,
     formState: { errors },
     reset,
+    setError,
   } = useForm<FormData>({
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
@@ -134,11 +135,12 @@ export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update account");
+        const res = await response.json();
+        const error = res.error;
+        setError("email", { message: error });
+        throw new Error(error ?? "Something went wrong");
       }
 
-      const result = await response.json();
-      // await update(result);
       sessionUpdateTriggerUpdate({
         setIsRefreshing: setIsLoading,
         triggerReload: true,
