@@ -5,19 +5,18 @@ export function Footer() {
 
   return (
     <footer className="w-full border-t py-4 mt-auto">
-      <div className="container flex justify-center items-center">
-        <p className="text-sm text-muted-foreground">
-          <Link
-            href="https://maravian.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium underline underline-offset-4 hover:text-primary decoration-none"
-          >
-            Maravian
-          </Link>{" "}
-          © {currentYear}
-        </p>
-      </div>
+      <Link
+        href="https://maravian.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium hover:text-primary decoration-none"
+      >
+        <div className="container flex justify-center items-center">
+          <p className="text-sm text-muted-foreground">
+            Maravian © {currentYear}
+          </p>
+        </div>
+      </Link>
     </footer>
   );
 }

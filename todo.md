@@ -20,7 +20,10 @@
   - on arrived on no accessed team enter password to join {cm:2025-03-20}
   - /account reform
   - forgot password functionality
-  - admin delete user
+  - Delete functionality
+    - teams
+    - team members
+    - tasks
   - Clone Team (Admin can make team available for cloning, then on make page people can clone their own copy of same checklist)
   - Day Assignment to members by admin
   - Delete Team by admin
