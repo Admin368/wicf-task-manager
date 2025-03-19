@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { format, parseISO, subDays } from "date-fns"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { 
-  Calendar, 
-  ChevronLeft, 
-  Loader2, 
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { format, parseISO, subDays } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Calendar,
+  ChevronLeft,
+  Loader2,
   TrendingUp,
   Users,
-  Filter
-} from "lucide-react"
-import { api } from "@/lib/trpc/client"
-import { toast } from "@/components/ui/use-toast"
-import { cn } from "@/lib/utils"
-import { Bar } from "@/components/ui/simple-bar-chart"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+  Filter,
+} from "lucide-react";
+import { api } from "@/lib/trpc/client";
+import { toast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
+import { Bar } from "@/components/ui/simple-bar-chart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 interface HistoryItem {
   check_in_date: string;
@@ -32,64 +32,63 @@ interface HistoryItem {
 }
 
 export default function CheckInHistoryPage() {
-  const params = useParams()
-  const router = useRouter()
-  const slug = params?.slug as string
-  const [view, setView] = useState("chart")
-  const [historyDays, setHistoryDays] = useState(30)
-  const [teamLoaded, setTeamLoaded] = useState(false)
+  const params = useParams();
+  const router = useRouter();
+  const slug = params?.slug as string;
+  const [view, setView] = useState("chart");
+  const [historyDays, setHistoryDays] = useState(30);
+  const [teamLoaded, setTeamLoaded] = useState(false);
 
   // Get team data
-  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery({ slug }, {
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Team not found or you don't have access.",
-        variant: "destructive",
-      })
-      router.push("/")
-    },
-  })
+  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery(
+    { slug },
+    {
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Team not found or you don't have access.",
+          variant: "destructive",
+        });
+        router.push("/");
+      },
+    }
+  );
 
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
-    { 
+    {
       enabled: !!team?.id,
       onSuccess: (data) => {
         if (!data.hasAccess) {
-          toast({
-            title: "Access Denied",
-            description: "You don't have access to this team.",
-            variant: "destructive",
-          })
-          router.push("/")
+          router.push(`/team/${slug}/join`);
         } else {
-          setTeamLoaded(true)
+          setTeamLoaded(true);
         }
       },
       onError: () => {
-        router.push("/")
-      }
+        router.push(`/team/${slug}/join`);
+      },
     }
-  )
+  );
 
   // Get team members count
   const { data: teamMembers } = api.users.getTeamMembers.useQuery(
     { teamId: team?.id || "" },
     { enabled: !!team?.id && teamLoaded }
-  )
+  );
 
   // Get check-in history
-  const { data: history, isLoading: historyLoading } = api.checkIns.getHistory.useQuery(
-    { 
-      teamId: team?.id || "",
-      limit: historyDays
-    },
-    { enabled: !!team?.id && teamLoaded }
-  )
+  const { data: history, isLoading: historyLoading } =
+    api.checkIns.getHistory.useQuery(
+      {
+        teamId: team?.id || "",
+        limit: historyDays,
+      },
+      { enabled: !!team?.id && teamLoaded }
+    );
 
-  const totalMembers = teamMembers?.length || 0
+  const totalMembers = teamMembers?.length || 0;
 
   // Process chart data
   const chartData = history
@@ -97,17 +96,19 @@ export default function CheckInHistoryPage() {
         .map((day: HistoryItem) => ({
           name: format(parseISO(day.check_in_date), "MMM d"),
           value: Number(day.check_in_count),
-          percentage: Math.round((Number(day.check_in_count) / totalMembers) * 100)
+          percentage: Math.round(
+            (Number(day.check_in_count) / totalMembers) * 100
+          ),
         }))
         .reverse() // Show oldest to newest
-    : []
+    : [];
 
   if (teamLoading || !teamLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    )
+    );
   }
 
   return (
@@ -189,23 +190,36 @@ export default function CheckInHistoryPage() {
                 <TabsContent value="list" className="mt-0">
                   <div className="space-y-1 max-h-[400px] overflow-y-auto">
                     {history.map((day: HistoryItem) => {
-                      const percentage = Math.round((Number(day.check_in_count) / totalMembers) * 100)
+                      const percentage = Math.round(
+                        (Number(day.check_in_count) / totalMembers) * 100
+                      );
                       return (
-                        <div 
-                          key={day.check_in_date} 
+                        <div
+                          key={day.check_in_date}
                           className="flex items-center justify-between p-3 rounded hover:bg-muted"
-                          onClick={() => router.push(`/team/${slug}/check-ins?date=${day.check_in_date}`)}
+                          onClick={() =>
+                            router.push(
+                              `/team/${slug}/check-ins?date=${day.check_in_date}`
+                            )
+                          }
                         >
                           <div className="flex items-center gap-3">
-                            <div 
+                            <div
                               className={cn(
                                 "w-2 h-2 rounded-full",
-                                percentage >= 75 ? "bg-green-500" :
-                                percentage >= 50 ? "bg-amber-500" :
-                                "bg-red-500"
+                                percentage >= 75
+                                  ? "bg-green-500"
+                                  : percentage >= 50
+                                  ? "bg-amber-500"
+                                  : "bg-red-500"
                               )}
                             />
-                            <span>{format(parseISO(day.check_in_date), "EEEE, MMMM d")}</span>
+                            <span>
+                              {format(
+                                parseISO(day.check_in_date),
+                                "EEEE, MMMM d"
+                              )}
+                            </span>
                           </div>
                           <div className="flex items-center gap-6">
                             <span className="text-sm text-muted-foreground">
@@ -216,7 +230,7 @@ export default function CheckInHistoryPage() {
                             </span>
                           </div>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 </TabsContent>
@@ -226,5 +240,5 @@ export default function CheckInHistoryPage() {
         </Card>
       </div>
     </div>
-  )
-} 
+  );
+}

@@ -10,7 +10,7 @@ import { Header } from "@/components/header";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Live Task Tracker",
+  title: "Maravian Checklist",
   description: "Track team tasks in real-time",
   generator: "v0.dev",
 };

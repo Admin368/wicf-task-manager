@@ -23,12 +23,35 @@ type TeamIdInput = {
 export const teamsRouter = router({
   getAll: publicProcedure.query(async ({ ctx }) => {
     try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const teams = await ctx.prisma.team.findMany({
         select: {
           id: true,
           name: true,
           slug: true,
           createdAt: true,
+          members: {
+            select: {
+              userId: true,
+              role: true,
+            },
+          },
+          checkIns: {
+            where: {
+              checkInDate: today,
+            },
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
         },
         where: {
           isDeleted: false,
@@ -37,6 +60,54 @@ export const teamsRouter = router({
       return teams || [];
     } catch (error) {
       console.error("Error fetching teams:", error);
+      return [];
+    }
+  }),
+
+  getJoinedTeams: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const teams = await ctx.prisma.team.findMany({
+        where: {
+          isDeleted: false,
+          members: {
+            some: {
+              userId: ctx.userId,
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          createdAt: true,
+          members: {
+            select: {
+              userId: true,
+              role: true,
+            },
+          },
+          checkIns: {
+            where: {
+              checkInDate: today,
+            },
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      return teams || [];
+    } catch (error) {
+      console.error("Error fetching joined teams:", error);
       return [];
     }
   }),
@@ -122,12 +193,26 @@ export const teamsRouter = router({
         password: z.string(),
       })
     )
-    .mutation(async ({ ctx, input }: { ctx: Context; input: JoinInput }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
         if (!ctx.userId) throw new Error("User ID is required");
-        const userId = ctx.userId; // Create a non-nullable reference
 
-        // Verify password
+        // Check if user is already a member
+        const existingMembership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
+
+        // If already a member, return success
+        if (existingMembership) {
+          return { success: true };
+        }
+
+        // If not a member, verify password
         const team = await ctx.prisma.team.findUnique({
           where: { id: input.teamId },
           select: { password: true },
@@ -137,26 +222,14 @@ export const teamsRouter = router({
           throw new Error("Incorrect password");
         }
 
-        // Check if user is already a member
-        const existingMembership = await ctx.prisma.teamMember.findUnique({
-          where: {
-            teamId_userId: {
-              teamId: input.teamId,
-              userId,
-            },
+        // Add them as a member
+        await ctx.prisma.teamMember.create({
+          data: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+            role: "member",
           },
         });
-
-        // If not already a member, add them
-        if (!existingMembership) {
-          await ctx.prisma.teamMember.create({
-            data: {
-              teamId: input.teamId,
-              userId,
-              role: "member",
-            },
-          });
-        }
 
         return { success: true };
       } catch (error) {

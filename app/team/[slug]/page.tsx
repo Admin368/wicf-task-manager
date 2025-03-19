@@ -54,18 +54,13 @@ export default function TeamPage() {
       enabled: !!team?.id,
       onSuccess: (data) => {
         if (!data.hasAccess) {
-          toast({
-            title: "Access Denied",
-            description: "You don't have access to this team.",
-            variant: "destructive",
-          });
-          router.push("/");
+          router.push(`/team/${slug}/join`);
         } else {
           setTeamLoaded(true);
         }
       },
       onError: () => {
-        router.push("/");
+        router.push(`/team/${slug}/join`);
       },
     }
   );
@@ -119,7 +114,7 @@ export default function TeamPage() {
             variant="outline"
             className="w-full"
             onClick={() => {
-              const inviteLink = `${window.location.origin}/team/${slug}`;
+              const inviteLink = `${window.location.origin}/team/${slug}/join`;
               const message = `🌟 Maravian Checklist 🌟\nA collaborative task manager with daily check-ins to keep your team in sync!\n\n👋 Join my team "${team.name}" on Maravian Checklist!\n\n📎 Team Link: ${inviteLink}\n🔑 Team Password: ${team.password}\n\nClick the link and use the password to join our team. Let's collaborate together!`;
               navigator.clipboard.writeText(message);
               toast({

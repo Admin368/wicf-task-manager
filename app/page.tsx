@@ -9,7 +9,8 @@ export default function Home() {
             Welcome to Checklist
           </h1>
           <p className="text-muted-foreground">
-            Join or create a team to manage tasks together.
+            Live task tracker for Teams and individuals for event planning,
+            daily tasks, recurring tasks, and more.
           </p>
         </div>
 

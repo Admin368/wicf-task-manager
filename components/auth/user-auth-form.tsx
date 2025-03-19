@@ -31,26 +31,31 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     resolver: zodResolver(formSchema),
   });
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [authError, setAuthError] = React.useState<string>("");
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/account";
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
+    setAuthError("");
 
     try {
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
-        redirect: true,
-        callbackUrl,
+        redirect: false,
       });
 
       if (result?.error) {
-        toast.error("Invalid credentials");
+        setAuthError("Invalid email or password");
+        setIsLoading(false);
+        return;
       }
+
+      // Only redirect on successful login
+      window.location.href = callbackUrl;
     } catch (error) {
-      toast.error("Something went wrong. Please try again.");
-    } finally {
+      setAuthError("An unexpected error occurred. Please try again.");
       setIsLoading(false);
     }
   }
@@ -59,6 +64,11 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     <div className={className} {...props}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid gap-4">
+          {authError && (
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
+              {authError}
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input

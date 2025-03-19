@@ -69,18 +69,13 @@ export default function CheckInsPage() {
       enabled: !!team?.id,
       onSuccess: (data) => {
         if (!data.hasAccess) {
-          toast({
-            title: "Access Denied",
-            description: "You don't have access to this team.",
-            variant: "destructive",
-          });
-          router.push("/");
+          router.push(`/team/${slug}/join`);
         } else {
           setTeamLoaded(true);
         }
       },
       onError: () => {
-        router.push("/");
+        router.push(`/team/${slug}/join`);
       },
     }
   );
