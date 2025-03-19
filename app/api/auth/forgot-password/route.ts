@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomBytes } from "crypto";
+import { EmailService } from "@/lib/email";
+import { env } from "@/lib/env";
 
 export async function POST(req: Request) {
   try {
@@ -26,10 +28,14 @@ export async function POST(req: Request) {
       },
     });
 
-    // Here you would typically send an email with the reset token
-    // For now, we'll just return success
+    // Send password reset email
+    const resetUrl = `${env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
+    await EmailService.sendPasswordResetEmail(email, {
+      name: user.name || "User",
+      resetUrl,
+    });
 
-    return new NextResponse("Password reset initiated", { status: 200 });
+    return new NextResponse("Password reset email sent", { status: 200 });
   } catch (error) {
     console.error("[FORGOT_PASSWORD_ERROR]", error);
     return new NextResponse("Internal Error", { status: 500 });

@@ -1,4 +1,4 @@
-# Live Task Tracker
+Maravian CheckList
 
 A real-time task tracking application for teams to check off completed tasks on specific dates.
 
@@ -28,4 +28,3 @@ A real-time task tracking application for teams to check off completed tasks on 
 ### Environment Variables
 
 Create a `.env.local` file with the following variables:
-

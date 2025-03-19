@@ -29,16 +29,19 @@
   - Delete Team by admin
   - Dont allow task ticking before checkedin
   - Add Done for the Day( Checkout button functionality)
+
     - checkout time
     - rate how the day was put of 5 stars
     - write notes
     - add it on the tabs on team page
     - checkout history with notes (so can be used as summary) and overal rating
 
-- # Bugs
-
   - If teams already Joined no need for password {cm:2025-03-20}
   - UserList Broken
   - Front End dont allow Tick if not checked in
 
 /account update details from DB
+
+Email functionality
+
+Launch Post
