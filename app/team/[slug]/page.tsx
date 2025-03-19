@@ -146,10 +146,7 @@ export default function TeamPage() {
             View Full Check-in History
           </Button>
 
-          {teamMembers?.some(
-            (member: TeamMember) =>
-              member.role && member.role === "admin" && member.id === userId
-          ) && (
+          {isAdmin && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full">

@@ -60,7 +60,14 @@ export const usersRouter = router({
           },
         });
 
-        return members;
+        // Transform the data to include role information
+        return members.map(member => ({
+          id: member.user.id,
+          name: member.user.name,
+          email: member.user.email,
+          avatarUrl: member.user.avatarUrl,
+          role: member.role,
+        }));
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error("Error fetching team members:", error);

@@ -93,7 +93,17 @@ export default function CheckInsPage() {
         teamId: team?.id || "",
         date: formattedDate,
       },
-      { enabled: !!team?.id && teamLoaded }
+      { 
+        enabled: !!team?.id && teamLoaded,
+        retry: false,
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "Failed to get check-ins. Please refresh the page.",
+            variant: "destructive",
+          });
+        },
+      }
     );
 
   // Get daily history
@@ -103,7 +113,17 @@ export default function CheckInsPage() {
         teamId: team?.id || "",
         limit: 30,
       },
-      { enabled: !!team?.id && teamLoaded }
+      { 
+        enabled: !!team?.id && teamLoaded,
+        retry: false,
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "Failed to get check-in history. Please refresh the page.",
+            variant: "destructive",
+          });
+        },
+      }
     );
 
   const totalMembers = teamMembers?.length || 0;

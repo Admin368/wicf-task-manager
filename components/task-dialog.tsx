@@ -30,7 +30,7 @@ interface TaskDialogProps {
   initialData?: {
     id: string;
     title: string;
-    parent_id: string | null;
+    parentId: string | null;
   };
   tasks: any[];
   teamId: string;
@@ -47,12 +47,12 @@ export function TaskDialog({
 }: TaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState(initialData?.title || "");
   const [parentId, setParentId] = useState<string | null>(
-    initialData?.parent_id || null
+    initialData?.parentId || null
   );
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setParentId(initialData?.parent_id || null);
+    setParentId(initialData?.parentId || null);
   }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {

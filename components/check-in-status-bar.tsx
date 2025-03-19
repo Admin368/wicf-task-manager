@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { UserList } from "@/components/user-list";
+import { toast } from "@/components/ui/use-toast";
 
 interface CheckInStatusBarProps {
   teamId: string;
@@ -31,10 +32,23 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
   const [showCheckedInUsers, setShowCheckedInUsers] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
   
-  const { data: checkIns, isLoading } = api.checkIns.getByTeamAndDate.useQuery({
-    teamId,
-    date: today,
-  });
+  const { data: checkIns, isLoading } = api.checkIns.getByTeamAndDate.useQuery(
+    {
+      teamId,
+      date: today,
+    },
+    {
+      enabled: !!teamId,
+      retry: false,
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to get check-ins. Please refresh the page.",
+          variant: "destructive",
+        });
+      },
+    }
+  );
 
   const checkedInCount = checkIns?.length || 0;
   const percentage = totalMembers > 0 ? Math.round((checkedInCount / totalMembers) * 100) : 0;

@@ -155,14 +155,14 @@ export function UserList({
                     {member.name
                       ? member.name
                           .split(" ")
-                          .map((n: string) => n[0])
+                          .map((n) => n[0])
                           .join("")
                           .toUpperCase()
                       : "?"}
                   </AvatarFallback>
                 )}
               </Avatar>
-              <div className="flex-grow">
+              <div className="flex-1">
                 <div className="font-medium">
                   {member.name}
                   {member.id === currentUserId && (
@@ -176,72 +176,57 @@ export function UserList({
                     {member.email}
                   </div>
                 )}
-                {member.notes && (
-                  <div className="text-sm italic mt-1">{member.notes}</div>
-                )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex flex-col items-end gap-2">
-                  <Badge
-                    variant="secondary"
-                    className={`flex items-center ${getRoleColor(member.role)}`}
-                  >
-                    {getRoleIcon(member.role)}
-                    {member.role
-                      ? member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)
-                      : "Member"}
-                  </Badge>
-                  {showTime && member.checkedInAt && (
-                    <Badge
-                      variant="outline"
-                      className="flex items-center text-xs"
-                    >
-                      <Clock className="h-3 w-3 mr-1" />
-                      {format(new Date(member.checkedInAt), "h:mm a")}
-                    </Badge>
-                  )}
-                </div>
+                <Badge
+                  variant="secondary"
+                  className={`flex items-center ${getRoleColor(member.role)}`}
+                >
+                  {getRoleIcon(member.role)}
+                  {member.role
+                    ? member.role.charAt(0).toUpperCase() +
+                      member.role.slice(1)
+                    : "Member"}
+                </Badge>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleCopyId(member.id)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy ID
-                    </DropdownMenuItem>
+                {isAdmin && member.id !== currentUserId && teamId && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleCopyId(member.id)}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy ID
+                      </DropdownMenuItem>
 
-                    {isAdmin &&
-                      member.role &&
-                      member.role !== "owner" &&
-                      teamId &&
-                      member.id !== currentUserId &&
-                      (member.role === "admin" ? (
-                        <DropdownMenuItem
-                          onClick={() => handleRoleChange(member.id, "member")}
-                          className="text-destructive"
-                        >
-                          <ShieldOff className="h-4 w-4 mr-2" />
-                          Remove Admin
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem
-                          onClick={() => handleRoleChange(member.id, "admin")}
-                        >
-                          <Shield className="h-4 w-4 mr-2" />
-                          Make Admin
-                        </DropdownMenuItem>
-                      ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      {member.role !== "owner" && (
+                        member.role === "admin" ? (
+                          <DropdownMenuItem
+                            onClick={() => handleRoleChange(member.id, "member")}
+                            className="text-destructive"
+                          >
+                            <ShieldOff className="h-4 w-4 mr-2" />
+                            Remove Admin
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={() => handleRoleChange(member.id, "admin")}
+                          >
+                            <Shield className="h-4 w-4 mr-2" />
+                            Make Admin
+                          </DropdownMenuItem>
+                        )
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
           ))}

@@ -32,10 +32,23 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
     data: checkInStatus,
     isLoading: checkingStatus,
     refetch: refetchStatus,
-  } = api.checkIns.getUserCheckInStatus.useQuery({
-    teamId,
-    date: today,
-  });
+  } = api.checkIns.getUserCheckInStatus.useQuery(
+    {
+      teamId,
+      date: today,
+    },
+    {
+      enabled: !!teamId, // Only run query when teamId exists
+      retry: false, // Don't retry on error
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to get check-in status. Please refresh the page.",
+          variant: "destructive",
+        });
+      },
+    }
+  );
 
   // Mutation for checking in
   const { mutate: checkIn, isLoading: isCheckingIn } =

@@ -27,6 +27,7 @@ interface TaskItemProps {
     title: string;
     parentId: string | null;
     position: number;
+    teamId: string;
   };
   tasks: any[];
   completions: any[];
@@ -41,6 +42,7 @@ interface TaskItemProps {
   refetchCompletions?: () => void;
   dragHandleProps?: Record<string, any>;
   isAdmin?: boolean;
+  hideTools?: boolean;
 }
 
 export function TaskItem({
@@ -56,7 +58,8 @@ export function TaskItem({
   onMoveTask,
   className,
   refetchCompletions,
-  isAdmin = false,
+  isAdmin,
+  hideTools,
 }: TaskItemProps) {
   const { userId } = useUser();
   const [expanded, setExpanded] = useState(true);
@@ -67,23 +70,33 @@ export function TaskItem({
     null
   );
   const today = format(new Date(), "yyyy-MM-dd");
-
+  const teamId = task.teamId;
   const {
     data: checkInStatus,
     isLoading: checkingStatus,
     refetch: refetchStatus,
   } = api.checkIns.getUserCheckInStatus.useQuery({
-    teamId: teamMembers[0].teamId,
+    teamId,
     date: today,
+  },{
+    enabled: !!teamId,
+    retry: false,
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to get check-in status. Please refresh the page.",
+      });
+    },
   });
 
   // Check if current user is admin
-  const isAdminUser = teamMembers?.find(
-    (member) =>
-      member.id === userId &&
-      member.role &&
-      (member.role === "admin" || member.role === "owner")
-  );
+  // let isAdmin = teamMembers?.find(
+  //   (member) =>
+  //     member.id === userId &&
+  //     member.role &&
+  //     (member.role === "admin" || member.role === "owner")
+  // );
+  // let isAdmin = true;
 
   const toggleCompletion = api.completions.toggle.useMutation({
     onError: (error) => {
@@ -239,18 +252,18 @@ export function TaskItem({
             {completedBy && (
               <span className="text-sm text-muted-foreground">
                 Completed by{" "}
-                {teamMembers.find((m) => m.userId === completedBy)?.user?.name}
+                {teamMembers.find((m) => m.id === completedBy)?.name}
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-1">
-            {isAdmin && (
+            {isAdmin && !hideTools && (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  className="h-8 w-8 group-hover:opacity-100 "
                   onClick={() => onEditTask?.(task)}
                 >
                   <Pencil className="h-4 w-4" />
@@ -258,7 +271,7 @@ export function TaskItem({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  className="h-8 w-8 group-hover:opacity-100"
                   onClick={() => onDeleteTask?.(task.id)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -266,7 +279,7 @@ export function TaskItem({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  className="h-8 w-8 group-hover:opacity-100"
                   onClick={() => onAddSubtask?.(task.id)}
                 >
                   <Plus className="h-4 w-4" />
@@ -276,7 +289,7 @@ export function TaskItem({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      className="h-8 w-8 group-hover:opacity-100"
                       onClick={() => onMoveTask(task.id, "up")}
                     >
                       <ArrowUp className="h-4 w-4" />
@@ -284,7 +297,7 @@ export function TaskItem({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      className="h-8 w-8 group-hover:opacity-100"
                       onClick={() => onMoveTask(task.id, "down")}
                     >
                       <ArrowDown className="h-4 w-4" />
@@ -313,6 +326,7 @@ export function TaskItem({
                 onMoveTask={onMoveTask}
                 refetchCompletions={refetchCompletions}
                 isAdmin={isAdmin}
+                hideTools={hideTools}
               />
             ))}
           </div>

@@ -12,7 +12,7 @@ import { useUser } from "./user-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { Task, TeamMember } from "@prisma/client";
+import { Task } from "@prisma/client";
 
 export function TaskList({
   teamId,
@@ -29,6 +29,7 @@ export function TaskList({
   const [showUserList, setShowUserList] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hideTools, setHideTools] = useState(false);
 
   // Add team member query to check admin status
   // const { data: teamMember } = api.teams.getMember.useQuery(
@@ -142,6 +143,10 @@ export function TaskList({
       console.error("Failed to create task:", error);
     }
   };
+  const onEditTask = (task: Task) => {
+    setEditingTask(task);
+    setShowTaskDialog(true);
+  };
 
   const handleEditTask = async (data: {
     title: string;
@@ -159,6 +164,7 @@ export function TaskList({
 
       utils.tasks.getByTeam.invalidate({ teamId });
       setEditingTask(null);
+      setShowTaskDialog(false);
     } catch (error) {
       console.error("Failed to update task:", error);
     }
@@ -345,7 +351,10 @@ export function TaskList({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowTaskDialog(true)}
+                onClick={() => {
+                  setEditingTask(null);
+                  setShowTaskDialog(true);
+                }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Task
@@ -376,7 +385,7 @@ export function TaskList({
               Tasks for {format(selectedDate, "MMMM d, yyyy")}
             </h2>
           </div>
-          <div className="p-4 border-b bg-muted/50">
+          <div className="p-4 border-b bg-muted/50 flex gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -385,6 +394,16 @@ export function TaskList({
               }}
             >
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!isAdmin}
+              onClick={() => {
+                setHideTools(!hideTools);
+              }}
+            >
+              {hideTools ? "Show Task Tools" : "Hide Task Tools"}
             </Button>
           </div>
 
@@ -427,11 +446,12 @@ export function TaskList({
                         teamMembers={teamMembers || []}
                         selectedDate={selectedDate.toISOString().split("T")[0]}
                         onAddSubtask={handleAddSubtask}
-                        onEditTask={handleEditTask}
+                        onEditTask={onEditTask}
                         onDeleteTask={handleDeleteTask}
                         onMoveTask={handleMoveTask}
                         refetchCompletions={refetchCompletions}
                         isAdmin={isAdmin}
+                        hideTools={hideTools}
                       />
                     ))}
                   </div>
