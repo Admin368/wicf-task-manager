@@ -40,3 +40,5 @@
   - If teams already Joined no need for password {cm:2025-03-20}
   - UserList Broken
   - Front End dont allow Tick if not checked in
+
+/account update details from DB

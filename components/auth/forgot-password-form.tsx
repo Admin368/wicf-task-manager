@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
-
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 interface ForgotPasswordFormProps
   extends React.HTMLAttributes<HTMLDivElement> {}
 
@@ -21,15 +22,16 @@ export function ForgotPasswordForm({
   className,
   ...props
 }: ForgotPasswordFormProps) {
+  const router = useRouter();
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors: formErrors },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
   });
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
-
+  const [error, setError] = React.useState<string | undefined>(undefined);
   async function onSubmit(data: FormData) {
     setIsLoading(true);
 
@@ -43,10 +45,15 @@ export function ForgotPasswordForm({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to send reset email");
+        console.log(response);
+        const message = await response.statusText;
+        setError(message || "Something went wrong. Please try again.");
+        toast.error(message || "Something went wrong. Please try again.");
+        throw new Error(message ?? "Failed to send reset email");
       }
 
       toast.success("Password reset email sent. Please check your inbox.");
+      router.push("/forgot-password/success");
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -54,6 +61,11 @@ export function ForgotPasswordForm({
     }
   }
 
+  useEffect(() => {
+    if (formErrors.email) {
+      setError(formErrors.email.message);
+    }
+  }, [formErrors.email]);
   return (
     <div className={className} {...props}>
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -70,9 +82,7 @@ export function ForgotPasswordForm({
               disabled={isLoading}
               {...register("email")}
             />
-            {errors.email && (
-              <p className="text-sm text-red-500">{errors.email.message}</p>
-            )}
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
           <Button disabled={isLoading}>
             {isLoading && (

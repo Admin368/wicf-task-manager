@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
 import { useState, useEffect } from "react";
+// import { Session } from "next-auth";
 
 const accountFormSchema = z
   .object({
@@ -40,6 +41,51 @@ type FormData = z.infer<typeof accountFormSchema>;
 interface AccountFormProps {
   showPasswordFields?: boolean;
 }
+
+export const sessionUpdateTriggerUpdate = async ({
+  setIsRefreshing,
+  onSuccess,
+  triggerReload = false,
+}: {
+  setIsRefreshing?: (isRefreshing: boolean) => void;
+  onSuccess?: (session: any) => void;
+  triggerReload?: boolean;
+}) => {
+  setIsRefreshing?.(true);
+  try {
+    // Trigger session update to refresh user data
+    const csrfRes = await fetch("/api/auth/csrf");
+    const { csrfToken } = await csrfRes.json();
+
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        csrfToken,
+        data: { trigger: "update" },
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to refresh session");
+    }
+    toast.success("Permissions refreshed");
+    const session = (await res.json()) as any;
+    onSuccess?.(session);
+    if (triggerReload) {
+      window.location.reload();
+    } else {
+      return res;
+    }
+  } catch (error) {
+    toast.error("Failed to refresh permissions");
+    console.error(error);
+  } finally {
+    setIsRefreshing?.(false);
+  }
+};
 
 export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
   const { data: session, update } = useSession();
