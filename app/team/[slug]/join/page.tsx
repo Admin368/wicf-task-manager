@@ -23,7 +23,7 @@ export default function JoinTeamPage() {
   const [password, setPassword] = useState("");
   const [isJoining, setIsJoining] = useState(false);
 
-  const { data: team, isLoading } = api.teams.getBySlug.useQuery(
+  const { data: team, isLoading, error } = api.teams.getBySlug.useQuery(
     { slug },
     {
       onError: (error) => {

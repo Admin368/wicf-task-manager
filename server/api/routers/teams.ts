@@ -127,6 +127,12 @@ export const teamsRouter = router({
             isDeleted: false,
           },
         });
+        if (!team) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
         return team;
       } catch (error) {
         console.error("Error fetching team:", error);
