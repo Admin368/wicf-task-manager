@@ -46,6 +46,8 @@ interface UserListProps {
   onClose: () => void;
   showTime?: boolean;
   teamId?: string;
+  currentUserId?: string;
+  isAdmin?: boolean;
 }
 
 export function UserList({
@@ -53,33 +55,21 @@ export function UserList({
   onClose,
   showTime,
   teamId,
+  currentUserId,
+  isAdmin = false,
 }: UserListProps) {
   const { userId } = useUser();
-
-  // Check if current user is admin
-  const isAdmin = teamMembers?.find(
-    (member) =>
-      member.id === userId &&
-      member.role &&
-      (member.role === "admin" || member.role === "owner")
-  );
-
-  const utils = api.useContext();
-  const updateRole = api.users.updateRole.useMutation({
+  const updateRole = api.teams.updateMemberRole.useMutation({
     onSuccess: () => {
       toast({
-        title: "Success",
-        description: "User role updated successfully.",
+        title: "Role updated",
+        description: "The member's role has been updated successfully",
       });
-      // Refetch team members to update the UI
-      if (teamId) {
-        utils.users.getTeamMembers.invalidate({ teamId });
-      }
     },
     onError: (error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update user role.",
+        description: error.message || "Failed to update role",
         variant: "destructive",
       });
     },
@@ -163,17 +153,19 @@ export function UserList({
                 ) : (
                   <AvatarFallback>
                     {member.name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")
-                      .toUpperCase()}
+                      ? member.name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")
+                          .toUpperCase()
+                      : "?"}
                   </AvatarFallback>
                 )}
               </Avatar>
               <div className="flex-grow">
                 <div className="font-medium">
                   {member.name}
-                  {member.id === userId && (
+                  {member.id === currentUserId && (
                     <Badge variant="outline" className="ml-2 text-xs">
                       Me
                     </Badge>
@@ -231,6 +223,7 @@ export function UserList({
                       member.role &&
                       member.role !== "owner" &&
                       teamId &&
+                      member.id !== currentUserId &&
                       (member.role === "admin" ? (
                         <DropdownMenuItem
                           onClick={() => handleRoleChange(member.id, "member")}

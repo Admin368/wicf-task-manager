@@ -40,6 +40,7 @@ interface TaskItemProps {
   className?: string;
   refetchCompletions?: () => void;
   dragHandleProps?: Record<string, any>;
+  isAdmin?: boolean;
 }
 
 export function TaskItem({
@@ -55,6 +56,7 @@ export function TaskItem({
   onMoveTask,
   className,
   refetchCompletions,
+  isAdmin = false,
 }: TaskItemProps) {
   const { userId } = useUser();
   const [expanded, setExpanded] = useState(true);
@@ -76,7 +78,7 @@ export function TaskItem({
   });
 
   // Check if current user is admin
-  const isAdmin = teamMembers?.find(
+  const isAdminUser = teamMembers?.find(
     (member) =>
       member.id === userId &&
       member.role &&
@@ -243,51 +245,53 @@ export function TaskItem({
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => onAddSubtask?.(task.id)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => onEditTask?.(task)}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
             {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onDeleteTask?.(task.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-            {!isFirst && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onMoveTask?.(task.id, "up")}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
-            )}
-            {!isLast && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onMoveTask?.(task.id, "down")}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  onClick={() => onEditTask?.(task)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  onClick={() => onDeleteTask?.(task.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                  onClick={() => onAddSubtask?.(task.id)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                {onMoveTask && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      onClick={() => onMoveTask(task.id, "up")}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      onClick={() => onMoveTask(task.id, "down")}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -308,6 +312,7 @@ export function TaskItem({
                 onDeleteTask={onDeleteTask}
                 onMoveTask={onMoveTask}
                 refetchCompletions={refetchCompletions}
+                isAdmin={isAdmin}
               />
             ))}
           </div>

@@ -9,7 +9,7 @@ export default withAuth({
 export const config = {
   matcher: [
     "/account/:path*",
-    "/teams/:path*",
+    "/team/:path*",
     "/api/account/:path*",
     "/api/teams/:path*",
   ],

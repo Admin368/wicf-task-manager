@@ -17,9 +17,11 @@ import type { Task, TeamMember } from "@prisma/client";
 export function TaskList({
   teamId,
   teamName,
+  isAdmin = false,
 }: {
   teamId: string;
   teamName: string;
+  isAdmin?: boolean;
 }) {
   const { userId, userName } = useUser();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -27,6 +29,12 @@ export function TaskList({
   const [showUserList, setShowUserList] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Add team member query to check admin status
+  // const { data: teamMember } = api.teams.getMember.useQuery(
+  //   { teamId, userId: userId || "" },
+  //   { enabled: !!userId }
+  // );
 
   const formattedDate = selectedDate.toISOString().split("T")[0];
 
@@ -119,6 +127,7 @@ export function TaskList({
     title: string;
     parentId: string | null;
   }) => {
+    if (!isAdmin) return;
     try {
       setError(null);
       await createTask.mutateAsync({
@@ -138,7 +147,7 @@ export function TaskList({
     title: string;
     parentId: string | null;
   }) => {
-    if (!editingTask) return;
+    if (!isAdmin || !editingTask) return;
 
     try {
       setError(null);
@@ -156,6 +165,8 @@ export function TaskList({
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    if (!isAdmin) return;
+
     if (
       !confirm(
         "Are you sure you want to delete this task and all its subtasks?"
@@ -173,6 +184,7 @@ export function TaskList({
   };
 
   const handleAddSubtask = (parentId: string) => {
+    if (!isAdmin) return;
     // Find the parent task
     const parentTask = tasks?.find((t: Task) => t.id === parentId);
     if (parentTask) {
@@ -187,6 +199,7 @@ export function TaskList({
   };
 
   const handleMoveTask = async (taskId: string, direction: "up" | "down") => {
+    if (!isAdmin) return;
     try {
       // Find the task and its siblings
       const task = tasks?.find((t: Task) => t.id === taskId);
@@ -235,6 +248,7 @@ export function TaskList({
     newIndex: number,
     tasks: Task[]
   ) => {
+    if (!isAdmin) return;
     if (tasks.length === 0) return 0;
     if (tasks.length === 1) return tasks[0].position;
 
@@ -256,20 +270,27 @@ export function TaskList({
 
   const renderTasks = (tasks: Task[], level = 0) => {
     return tasks.map((task) => (
-      <TaskItem
-        key={task.id}
-        task={task}
-        tasks={tasks}
-        completions={completions || []}
-        teamMembers={teamMembers || []}
-        selectedDate={formattedDate}
-        level={level}
-        onAddSubtask={handleAddSubtask}
-        onEditTask={setEditingTask}
-        onDeleteTask={handleDeleteTask}
-        onMoveTask={handleMoveTask}
-        refetchCompletions={refetchCompletions}
-      />
+      <div key={task.id}>
+        <TaskItem
+          task={task}
+          tasks={tasks}
+          completions={completions || []}
+          teamMembers={teamMembers || []}
+          selectedDate={formattedDate}
+          level={level}
+          onAddSubtask={handleAddSubtask}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
+          onMoveTask={handleMoveTask}
+          refetchCompletions={refetchCompletions}
+          isAdmin={isAdmin}
+        />
+        {task.subtasks && task.subtasks.length > 0 && (
+          <div className="ml-6 mt-2">
+            {renderTasks(task.subtasks, level + 1)}
+          </div>
+        )}
+      </div>
     ));
   };
 
@@ -315,38 +336,31 @@ export function TaskList({
         )}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <DatePicker date={selectedDate} onDateChange={handleDateChange} />
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowUserList(!showUserList)}
-              disabled={isLoadingMembers}
-            >
-              {isLoadingMembers ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <Users className="h-4 w-4 mr-2" />
-                  Team Members ({teamMembers?.length || 0})
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={() => {
-                setEditingTask(null);
-                setShowTaskDialog(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              {/* Add Task */}
-            </Button>
+          <div className="flex items-center space-x-2">
+            <DatePicker
+              date={selectedDate}
+              onDateChange={handleDateChange}
+            />
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTaskDialog(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+              </Button>
+            )}
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowUserList(true)}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Team Members
+          </Button>
         </div>
 
         {showUserList && teamMembers && (
@@ -417,6 +431,7 @@ export function TaskList({
                         onDeleteTask={handleDeleteTask}
                         onMoveTask={handleMoveTask}
                         refetchCompletions={refetchCompletions}
+                        isAdmin={isAdmin}
                       />
                     ))}
                   </div>

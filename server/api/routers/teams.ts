@@ -5,6 +5,7 @@ import { slugify } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import type { Context } from "@/lib/trpc/server";
+import { TRPCError } from "@trpc/server";
 
 type TeamInput = {
   name: string;
@@ -310,6 +311,65 @@ export const teamsRouter = router({
         console.error("Error deleting team:", error);
         throw error;
       }
+    }),
+
+  updateMemberRole: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        userId: z.string().uuid(),
+        role: z.enum(["admin", "member"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify the current user is an admin
+      const currentMember = await ctx.prisma.teamMember.findUnique({
+        where: {
+          teamId_userId: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+          },
+        },
+      });
+
+      if (!currentMember || currentMember.role !== "admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can update member roles",
+        });
+      }
+
+      // Update the member's role
+      return ctx.prisma.teamMember.update({
+        where: {
+          teamId_userId: {
+            teamId: input.teamId,
+            userId: input.userId,
+          },
+        },
+        data: {
+          role: input.role,
+        },
+      });
+    }),
+
+  getMember: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        userId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const member = await ctx.prisma.teamMember.findUnique({
+        where: {
+          teamId_userId: {
+            teamId: input.teamId,
+            userId: input.userId,
+          },
+        },
+      });
+      return member;
     }),
 });
 

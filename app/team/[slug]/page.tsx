@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import CheckInsPage from "./check-ins/page";
+import { UserList } from "@/components/user-list";
 
 export default function TeamPage() {
   const params = useParams();
@@ -32,6 +33,7 @@ export default function TeamPage() {
   const [teamLoaded, setTeamLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
   const { userId } = useUser();
+  const [showUserList, setShowUserList] = useState(false);
 
   const { data: team, isLoading } = api.teams.getBySlug.useQuery(
     { slug },
@@ -70,6 +72,13 @@ export default function TeamPage() {
     { teamId: team?.id || "" },
     { enabled: !!team?.id && teamLoaded }
   );
+
+  // Get current user's role
+  const currentUserRole = teamMembers?.find(
+    (member) => member.id === userId
+  )?.role;
+
+  const isAdmin = currentUserRole === "admin" || currentUserRole === "owner";
 
   const totalMembers = teamMembers?.length || 0;
 
@@ -179,12 +188,26 @@ export default function TeamPage() {
               <TabsTrigger value="checkins">Check Ins</TabsTrigger>
             </TabsList>
             <TabsContent value="tasks">
-              <TaskList teamId={team.id} teamName={team.name} />
+              <TaskList
+                teamId={team.id}
+                teamName={team.name}
+                isAdmin={isAdmin}
+              />
             </TabsContent>
             <TabsContent value="checkins">
               <CheckInsPage />
             </TabsContent>
           </Tabs>
+
+          {showUserList && (
+            <UserList
+              teamMembers={teamMembers || []}
+              onClose={() => setShowUserList(false)}
+              teamId={team?.id}
+              currentUserId={userId}
+              isAdmin={isAdmin}
+            />
+          )}
         </div>
       </div>
     </div>
