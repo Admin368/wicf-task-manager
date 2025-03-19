@@ -1,15 +1,15 @@
 import { Metadata } from "next";
-import { AccountForm } from "@/components/account/account-form";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { UserCircle, LineChart, Lock } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Account Settings",
-  description: "Manage your account settings",
+  title: "Account Security",
+  description: "Manage your account security settings",
 };
 
-export default function AccountPage() {
+export default function SecurityPage() {
   return (
     <div className="grid grid-cols-[240px_1fr] h-screen bg-background">
       {/* Sidebar Navigation */}
@@ -39,7 +39,7 @@ export default function AccountPage() {
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 bg-accent"
               asChild
             >
               <Link href="/account/security">
@@ -56,12 +56,15 @@ export default function AccountPage() {
         <div className="max-w-2xl">
           <div className="flex flex-col gap-8">
             <div>
-              <h1 className="text-3xl font-bold">Profile Settings</h1>
+              <h1 className="text-3xl font-bold">Security Settings</h1>
               <p className="text-muted-foreground">
-                Manage your profile information
+                Update your password and security preferences
               </p>
             </div>
-            <AccountForm showPasswordFields={false} />
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Change Password</h2>
+              <ChangePasswordForm />
+            </div>
           </div>
         </div>
       </div>

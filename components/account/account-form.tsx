@@ -9,24 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const accountFormSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .optional(),
-    confirmNewPassword: z.string().optional(),
+    // currentPassword: z.string().min(1, "Current password is required"),
+    // newPassword: z
+    //   .string()
+    //   .min(8, "Password must be at least 8 characters")
+    //   .optional(),
+    // confirmNewPassword: z.string().optional(),
   })
   .refine(
     (data) => {
-      if (data.newPassword && data.newPassword !== data.confirmNewPassword) {
-        return false;
-      }
+      // if (data.newPassword && data.newPassword !== data.confirmNewPassword) {
+      //   return false;
+      // }
       return true;
     },
     {
@@ -37,21 +37,43 @@ const accountFormSchema = z
 
 type FormData = z.infer<typeof accountFormSchema>;
 
-export function AccountForm() {
+interface AccountFormProps {
+  showPasswordFields?: boolean;
+}
+
+export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
   const { data: session, update } = useSession();
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<FormData>({
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
       name: session?.user?.name || "",
       email: session?.user?.email || "",
+      // currentPassword: "",
+      // newPassword: "",
+      // confirmNewPassword: "",
     },
   });
+
+  // Update form values when session data changes
+  useEffect(() => {
+    if (session?.user) {
+      reset({
+        name: session.user.name || "",
+        email: session.user.email || "",
+        // currentPassword: "",
+        // newPassword: "",
+        // confirmNewPassword: "",
+      });
+    }
+  }, [session, reset]);
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
@@ -72,6 +94,7 @@ export function AccountForm() {
       const result = await response.json();
       await update(result);
       toast.success("Account updated successfully");
+      setIsEditing(false);
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -79,80 +102,119 @@ export function AccountForm() {
     }
   }
 
+  function handleCancel() {
+    setIsEditing(false);
+    reset({
+      name: session?.user?.name || "",
+      email: session?.user?.email || "",
+      // currentPassword: "",
+      // newPassword: "",
+      // confirmNewPassword: "",
+    });
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="space-y-4">
-        <div>
+        <div className="grid gap-2">
           <Label htmlFor="name">Name</Label>
           <Input
             id="name"
             type="text"
-            disabled={isLoading}
+            className="max-w-lg"
+            disabled={isLoading || !isEditing}
             {...register("name")}
           />
           {errors.name && (
-            <p className="text-sm text-red-500">{errors.name.message}</p>
+            <p className="text-sm text-destructive">{errors.name.message}</p>
           )}
         </div>
-        <div>
+        <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             type="email"
-            disabled={isLoading}
+            className="max-w-lg"
+            disabled={isLoading || !isEditing}
             {...register("email")}
           />
           {errors.email && (
-            <p className="text-sm text-red-500">{errors.email.message}</p>
+            <p className="text-sm text-destructive">{errors.email.message}</p>
           )}
         </div>
       </div>
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="currentPassword">Current Password</Label>
-          <Input
-            id="currentPassword"
-            type="password"
-            disabled={isLoading}
-            {...register("currentPassword")}
-          />
-          {errors.currentPassword && (
-            <p className="text-sm text-red-500">
-              {errors.currentPassword.message}
-            </p>
-          )}
+      {/* {isEditing && showPasswordFields && (
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="currentPassword">Current Password</Label>
+            <Input
+              id="currentPassword"
+              type="password"
+              className="max-w-lg"
+              disabled={isLoading}
+              {...register("currentPassword")}
+            />
+            {errors.currentPassword && (
+              <p className="text-sm text-destructive">
+                {errors.currentPassword.message}
+              </p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="newPassword">New Password</Label>
+            <Input
+              id="newPassword"
+              type="password"
+              className="max-w-lg"
+              disabled={isLoading}
+              {...register("newPassword")}
+            />
+            {errors.newPassword && (
+              <p className="text-sm text-destructive">
+                {errors.newPassword.message}
+              </p>
+            )}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+            <Input
+              id="confirmNewPassword"
+              type="password"
+              className="max-w-lg"
+              disabled={isLoading}
+              {...register("confirmNewPassword")}
+            />
+            {errors.confirmNewPassword && (
+              <p className="text-sm text-destructive">
+                {errors.confirmNewPassword.message}
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <Label htmlFor="newPassword">New Password</Label>
-          <Input
-            id="newPassword"
-            type="password"
-            disabled={isLoading}
-            {...register("newPassword")}
-          />
-          {errors.newPassword && (
-            <p className="text-sm text-red-500">{errors.newPassword.message}</p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-          <Input
-            id="confirmNewPassword"
-            type="password"
-            disabled={isLoading}
-            {...register("confirmNewPassword")}
-          />
-          {errors.confirmNewPassword && (
-            <p className="text-sm text-red-500">
-              {errors.confirmNewPassword.message}
-            </p>
-          )}
-        </div>
+      )} */}
+      <div className="flex gap-4">
+        {!isEditing ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsEditing(true)}
+          >
+            Edit Profile
+          </Button>
+        ) : (
+          <>
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && (
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Save Changes
+            </Button>
+          </>
+        )}
       </div>
-      <Button disabled={isLoading}>
-        {isLoading && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
-        Update Account
-      </Button>
     </form>
   );
 }

@@ -1,45 +1,81 @@
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { NextResponse } from "next/server";
+import { authOptions } from "../../auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/auth";
 
-export async function PUT(req: Request) {
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.email) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "You must be logged in to update your account" },
+        { status: 401 }
+      );
     }
 
-    const { currentPassword, newPassword } = await req.json();
+    const { name, email } = await req.json();
 
-    const user = await db.user.findUnique({
-      where: { email: session.user.email },
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        email: true,
+      },
     });
 
     if (!user) {
-      return new NextResponse("User not found", { status: 404 });
+      return NextResponse.json(
+        { error: "User account not found" },
+        { status: 404 }
+      );
     }
 
     // Verify current password
-    const isValid = await verifyPassword(user.password, currentPassword);
+    // const isValid = await verifyPassword(currentPassword, user.password);
+    // if (!isValid) {
+    //   return NextResponse.json(
+    //     { error: "Current password is incorrect" },
+    //     { status: 400 }
+    //   );
+    // }
 
-    if (!isValid) {
-      return new NextResponse("Invalid current password", { status: 400 });
+    // Check if email is already taken
+    if (email !== user.email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: "Email is already in use" },
+          { status: 400 }
+        );
+      }
     }
 
-    // Hash and update new password
-    const hashedPassword = await hashPassword(newPassword);
-
-    await db.user.update({
-      where: { email: session.user.email },
-      data: { password: hashedPassword },
+    // Update user
+    const updatedUser = await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        name,
+        email,
+      },
     });
 
-    return new NextResponse("Password updated successfully", { status: 200 });
+    return NextResponse.json({
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+      },
+    });
   } catch (error) {
-    console.error("[UPDATE_PASSWORD_ERROR]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error("Error updating account:", error);
+    return NextResponse.json(
+      { error: "Failed to update account. Please try again later." },
+      { status: 500 }
+    );
   }
 }
