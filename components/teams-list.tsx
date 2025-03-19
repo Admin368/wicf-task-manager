@@ -17,6 +17,7 @@ import { Loader2, Lock, Plus, Search } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useUser } from "./user-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSession } from "next-auth/react";
 
 type TeamMember = {
   userId: string;
@@ -39,6 +40,7 @@ type APITeam = {
 };
 
 export function TeamsList() {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [teamPassword, setTeamPassword] = useState<Record<string, string>>({});
   const [joiningTeam, setJoiningTeam] = useState<string | null>(null);
@@ -53,7 +55,9 @@ export function TeamsList() {
   const { data: allTeams, isLoading: isAllTeamsLoading } =
     api.teams.getAll.useQuery<APITeam[]>();
   const { data: joinedTeams, isLoading: isJoinedTeamsLoading } =
-    api.teams.getJoinedTeams.useQuery<APITeam[]>();
+    api.teams.getJoinedTeams.useQuery<APITeam[]>(undefined, {
+      enabled: status === "authenticated",
+    });
 
   // Filter teams based on search query and filter type
   const filteredTeams = allTeams?.filter((team: APITeam) => {
@@ -159,13 +163,25 @@ export function TeamsList() {
           </div>
         </CardHeader>
         <CardContent>
+          <Button
+            className="w-full"
+            onClick={() =>
+              isJoined
+                ? router.push(`/team/${team.slug}`)
+                : router.push(`/team/${team.slug}/join`)
+            }
+          >
+            {isJoined ? "Enter Team" : "Join Team"}
+          </Button>
+        </CardContent>
+        <CardFooter>
           <div className="space-y-4">
             {checkedInUsers.length > 0 && (
               <div className="space-y-2">
                 <div className="text-sm text-muted-foreground">
-                  {checkedInUsers.length} checked in today
+                  Checked in members today: {checkedInUsers.length}
                 </div>
-                <div className="flex -space-x-2">
+                <div className="flex -space-x-2 hidden">
                   {checkedInUsers.slice(0, 5).map((user) => (
                     <div
                       key={user.id}
@@ -194,18 +210,6 @@ export function TeamsList() {
               </div>
             )}
           </div>
-        </CardContent>
-        <CardFooter>
-          <Button
-            className="w-full"
-            onClick={() =>
-              isJoined
-                ? router.push(`/team/${team.slug}`)
-                : router.push(`/team/${team.slug}/join`)
-            }
-          >
-            {isJoined ? "Enter Team" : "Join Team"}
-          </Button>
         </CardFooter>
       </Card>
     );
