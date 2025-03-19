@@ -59,7 +59,18 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user, trigger }) => {
+      // if trigger is updated, update the token
+      if (trigger === "update") {
+        const user = await db.user.findUnique({
+          where: {
+            id: token.id as string,
+          },
+        });
+        token.id = user?.id;
+        token.name = user?.name;
+        token.email = user?.email;
+      }
       if (user) {
         token.id = user.id;
       }

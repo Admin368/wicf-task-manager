@@ -42,6 +42,6 @@
 
 /account update details from DB
 
-Email functionality
+Email functionality {cm:2025-03-20}
 
 Launch Post

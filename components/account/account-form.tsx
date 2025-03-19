@@ -138,9 +138,15 @@ export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
       }
 
       const result = await response.json();
-      await update(result);
-      toast.success("Account updated successfully");
-      setIsEditing(false);
+      // await update(result);
+      sessionUpdateTriggerUpdate({
+        setIsRefreshing: setIsLoading,
+        triggerReload: true,
+        onSuccess: () => {
+          toast.success("Account updated successfully");
+          setIsEditing(false);
+        },
+      });
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -158,6 +164,15 @@ export function AccountForm({ showPasswordFields = true }: AccountFormProps) {
       // confirmNewPassword: "",
     });
   }
+
+  useEffect(() => {
+    sessionUpdateTriggerUpdate({
+      setIsRefreshing: setIsLoading,
+      onSuccess: () => {
+        setIsEditing(false);
+      },
+    });
+  }, []);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
