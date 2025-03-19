@@ -41,10 +41,10 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
   const { mutate: checkIn, isLoading: isCheckingIn } =
     api.checkIns.checkIn.useMutation({
       onSuccess: (data) => {
-        if (data.alreadyCheckedIn) {
+        if (data.success) {
           toast({
-            title: "Already checked in",
-            description: "You've already checked in today.",
+            title: "Checked in successfully",
+            description: "You've been marked as present for today.",
           });
         } else {
           toast({

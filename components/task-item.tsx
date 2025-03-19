@@ -19,7 +19,8 @@ import { useUser } from "./user-provider";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { TaskCompletionModal } from "./task-completion-modal";
-
+import { format } from "date-fns";
+import { toast as sonnerToast } from "sonner";
 interface TaskItemProps {
   task: {
     id: string;
@@ -63,6 +64,16 @@ export function TaskItem({
   const [pendingCompletion, setPendingCompletion] = useState<boolean | null>(
     null
   );
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const {
+    data: checkInStatus,
+    isLoading: checkingStatus,
+    refetch: refetchStatus,
+  } = api.checkIns.getUserCheckInStatus.useQuery({
+    teamId: teamMembers[0].teamId,
+    date: today,
+  });
 
   // Check if current user is admin
   const isAdmin = teamMembers?.find(
@@ -127,6 +138,16 @@ export function TaskItem({
 
   const completeTask = async (checked: boolean) => {
     try {
+      if (!checkInStatus?.checkedIn) {
+        console.log("Not checked in");
+        toast({
+          title: "Error",
+          description: "You must check in before completing tasks",
+          variant: "destructive",
+        });
+        sonnerToast.info("You must check in before completing tasks");
+        return;
+      }
       // Optimistically update UI
       setIsCompleted(checked);
       if (checked) {
