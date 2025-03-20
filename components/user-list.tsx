@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/trpc/client";
+import { useSession } from "next-auth/react";
 
 interface TeamMember {
   id: string;
@@ -45,9 +46,7 @@ interface UserListProps {
   teamMembers: TeamMember[];
   onClose: () => void;
   showTime?: boolean;
-  teamId?: string;
-  currentUserId?: string;
-  isAdmin?: boolean;
+  teamId: string;
 }
 
 export function UserList({
@@ -55,10 +54,10 @@ export function UserList({
   onClose,
   showTime,
   teamId,
-  currentUserId,
-  isAdmin = false,
 }: UserListProps) {
-  const { userId } = useUser();
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const isAdmin = teamMembers.find((member) => member.id === userId)?.role === "admin";
   const updateRole = api.teams.updateMemberRole.useMutation({
     onSuccess: () => {
       toast({
@@ -131,6 +130,9 @@ export function UserList({
             {showTime ? "Checked-in Members" : "Team Members"}
           </CardTitle>
           <CardDescription>
+            {isAdmin ? "Admin" : "Member"}
+          </CardDescription>
+          <CardDescription>
             {teamMembers.length}{" "}
             {teamMembers.length === 1 ? "member" : "members"}{" "}
             {showTime ? "checked in" : "in the team"}
@@ -165,7 +167,7 @@ export function UserList({
               <div className="flex-1">
                 <div className="font-medium">
                   {member.name}
-                  {member.id === currentUserId && (
+                  {member.id === userId && (
                     <Badge variant="outline" className="ml-2 text-xs">
                       Me
                     </Badge>
@@ -189,7 +191,7 @@ export function UserList({
                     : "Member"}
                 </Badge>
 
-                {isAdmin && member.id !== currentUserId && teamId && (
+                {isAdmin && teamId && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -206,7 +208,7 @@ export function UserList({
                         Copy ID
                       </DropdownMenuItem>
 
-                      {member.role !== "owner" && (
+                      {isAdmin && member.role !== "owner" && (
                         member.role === "admin" ? (
                           <DropdownMenuItem
                             onClick={() => handleRoleChange(member.id, "member")}

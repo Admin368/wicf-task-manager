@@ -374,6 +374,7 @@ export function TaskList({
 
         {showUserList && teamMembers && (
           <UserList
+            teamId={teamId}
             teamMembers={teamMembers}
             onClose={() => setShowUserList(false)}
           />

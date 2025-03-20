@@ -127,7 +127,7 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
                 checkedInAt: c.checkedInAt
               }))} 
               onClose={() => setShowCheckedInUsers(false)} 
-              showTime />
+                showTime teamId={teamId} />
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">

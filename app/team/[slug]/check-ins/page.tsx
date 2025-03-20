@@ -200,6 +200,7 @@ export default function CheckInsPage() {
                 }))}
                 onClose={() => {}}
                 showTime
+                teamId={team.id}
               />
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">

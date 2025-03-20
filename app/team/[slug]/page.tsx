@@ -10,8 +10,6 @@ import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/components/user-provider";
-import type { TeamMember } from "@prisma/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,14 +23,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import CheckInsPage from "./check-ins/page";
 import { UserList } from "@/components/user-list";
-
+import { useSession } from "next-auth/react";
 export default function TeamPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
   const [teamLoaded, setTeamLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("tasks");
-  const { userId } = useUser();
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
   const [showUserList, setShowUserList] = useState(false);
 
   const { data: team, isLoading } = api.teams.getBySlug.useQuery(
@@ -75,7 +74,7 @@ export default function TeamPage() {
 
   // Get current user's role
   const currentUserRole = teamMembers?.find(
-    (member) => member.id === userId
+    (member: any) => member.id === userId
   )?.role;
 
   const isAdmin = currentUserRole === "admin" || currentUserRole === "owner";
@@ -196,13 +195,11 @@ export default function TeamPage() {
             </TabsContent>
           </Tabs>
 
-          {showUserList && (
+          {showUserList && team.id && (
             <UserList
               teamMembers={teamMembers || []}
               onClose={() => setShowUserList(false)}
               teamId={team?.id}
-              currentUserId={userId}
-              isAdmin={isAdmin}
             />
           )}
         </div>
