@@ -8,6 +8,7 @@ import { UserProvider } from "@/components/user-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import "./globals.css";
+import { Toaster as SonnerToaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,6 +26,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${inter.className} flex flex-col min-h-full`}>
+        <Toaster />
+        <SonnerToaster />
         <Providers>
           <UserProvider>
             <Header />
@@ -32,7 +35,6 @@ export default function RootLayout({
             <Footer />
           </UserProvider>
         </Providers>
-        <Toaster />
       </body>
     </html>
   );

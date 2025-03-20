@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure } from "@/lib/trpc/server";
+import { router, publicProcedure, Context } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +32,74 @@ const checkInSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
   notes: z.string().optional(),
 });
+
+const checkoutSchema = z.object({
+  checkInId: z.string().uuid(),
+  rating: z.number().min(1).max(5),
+  notes: z.string().optional(),
+});
+
+interface CheckInWithUser {
+  id: string;
+  userId: string;
+  checkInDate: Date;
+  checkedInAt: Date;
+  notes: string | null;
+  rating: number | null;
+  checkoutAt: Date | null;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    avatarUrl: string | null;
+  };
+}
+
+async function serverGetCheckInStatus({
+  ctx,
+  teamId,
+  date,
+}: {
+  ctx: Context;
+  teamId: string;
+  date: string;
+}) {
+  const checkIn = await prisma.checkIn.findUnique({
+    where: {
+      teamId_userId_checkInDate: {
+        teamId: teamId,
+        userId: ctx.userId!,
+        checkInDate: toISODateTime(date),
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+  return {
+    checkedIn: !!checkIn,
+    checkInDetails: checkIn
+      ? {
+          id: checkIn.id,
+          userId: checkIn.userId,
+          checkInDate: checkIn.checkInDate,
+          checkedInAt: checkIn.checkedInAt,
+          notes: checkIn.notes,
+          rating: checkIn.rating,
+          checkoutAt: checkIn.checkoutAt,
+          user: checkIn.user,
+        }
+      : null,
+  };
+}
 
 export const checkInsRouter = router({
   getByTeamAndDate: protectedProcedure
@@ -76,12 +144,14 @@ export const checkInsRouter = router({
           },
         });
 
-        return checkIns.map((checkIn) => ({
+        return checkIns.map((checkIn: CheckInWithUser) => ({
           id: checkIn.id,
           userId: checkIn.userId,
           checkInDate: checkIn.checkInDate,
           checkedInAt: checkIn.checkedInAt,
           notes: checkIn.notes,
+          rating: checkIn.rating,
+          checkoutAt: checkIn.checkoutAt,
           user: checkIn.user,
         }));
       } catch (error) {
@@ -154,20 +224,11 @@ export const checkInsRouter = router({
         }
 
         // Check if the user has checked in for the day
-        const checkIn = await prisma.checkIn.findUnique({
-          where: {
-            teamId_userId_checkInDate: {
-              teamId: input.teamId,
-              userId: ctx.userId!,
-              checkInDate: toISODateTime(input.date),
-            },
-          },
+        return await serverGetCheckInStatus({
+          ctx,
+          teamId: input.teamId,
+          date: input.date,
         });
-
-        return {
-          checkedIn: !!checkIn,
-          checkInDetails: checkIn,
-        };
       } catch (error) {
         console.error("Error fetching check-in status:", error);
         if (error instanceof TRPCError) throw error;
@@ -213,6 +274,60 @@ export const checkInsRouter = router({
         };
       } catch (error) {
         console.error("Error checking in:", error);
+        throw error;
+      }
+    }),
+
+  checkout: protectedProcedure
+    .input(checkoutSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Get the check-in
+        const checkIn = await prisma.checkIn.findUnique({
+          where: { id: input.checkInId },
+          include: { team: true },
+        });
+
+        if (!checkIn) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Check-in not found",
+          });
+        }
+
+        // Verify user owns this check-in
+        if (checkIn.userId !== ctx.userId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only checkout your own check-in",
+          });
+        }
+
+        // Verify user hasn't already checked out
+        if (checkIn.checkoutAt) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You have already checked out for today",
+          });
+        }
+
+        // Update the check-in with checkout information
+        const updatedCheckIn = await prisma.checkIn.update({
+          where: { id: input.checkInId },
+          data: {
+            rating: input.rating,
+            notes: input.notes,
+            checkoutAt: new Date(),
+          },
+        });
+
+        return {
+          success: true,
+          message: "Successfully checked out",
+          checkIn: updatedCheckIn,
+        };
+      } catch (error) {
+        console.error("Error checking out:", error);
         throw error;
       }
     }),

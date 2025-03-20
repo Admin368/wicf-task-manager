@@ -2,13 +2,15 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Users, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Users, Calendar, ChevronDown, ChevronUp, LogOut } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { UserList } from "@/components/user-list";
 import { toast } from "@/components/ui/use-toast";
-
+import { CheckoutDialog } from "./checkout-dialog";
+import { StarRating } from "./star-rating";
+import { useSession } from "next-auth/react";
 interface CheckInStatusBarProps {
   teamId: string;
   totalMembers: number;
@@ -20,6 +22,8 @@ interface CheckIn {
   checkInDate: string;
   checkedInAt: string;
   notes: string | null;
+  rating: number | null;
+  checkoutAt: string | null;
   user: {
     id: string;
     name: string | null;
@@ -29,6 +33,7 @@ interface CheckIn {
 }
 
 export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps) {
+  const { data: session } = useSession();
   const [showCheckedInUsers, setShowCheckedInUsers] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
   
@@ -51,7 +56,12 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
   );
 
   const checkedInCount = checkIns?.length || 0;
+  const checkedOutCount = checkIns?.filter(c => c.checkoutAt)?.length || 0;
   const percentage = totalMembers > 0 ? Math.round((checkedInCount / totalMembers) * 100) : 0;
+  const checkoutPercentage = checkedInCount > 0 ? Math.round((checkedOutCount / checkedInCount) * 100) : 0;
+
+  // Get current user's check-in
+  const currentUserCheckIn = checkIns?.find(c => c.userId === session?.user?.id);
 
   return (
     <>
@@ -96,6 +106,15 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
               style={{ width: `${percentage}%` }}
             />
           </div>
+
+          {currentUserCheckIn && !currentUserCheckIn.checkoutAt && (
+            <div className="mt-4">
+              <CheckoutDialog
+                teamId={teamId}
+                checkInId={currentUserCheckIn.id}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -122,12 +141,15 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
                 name: c.user.name || 'Unknown',
                 email: c.user.email,
                 avatar_url: c.user.avatar_url,
-                role: 'member', // We don't have role in check-ins
+                role: 'member',
                 notes: c.notes,
-                checkedInAt: c.checkedInAt
+                checkedInAt: c.checkedInAt,
+                rating: c.rating,
+                checkoutAt: c.checkoutAt
               }))} 
               onClose={() => setShowCheckedInUsers(false)} 
-                showTime teamId={teamId} />
+              showTime
+              teamId={teamId} />
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">

@@ -4,9 +4,10 @@ import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 import type { Context } from "@/lib/trpc/server";
+import { getTeamMembers } from "./users";
 
 // Helper function to convert date string to ISO DateTime
-function toISODateTime(dateStr: string) {
+export function toISODateTime(dateStr: string) {
   const date = new Date(dateStr);
   // Set to start of day in local timezone
   date.setHours(0, 0, 0, 0);
@@ -20,6 +21,7 @@ const getByDateSchema = z.object({
 });
 
 const getAllByDateSchema = z.object({
+  teamId: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
 });
 
@@ -101,6 +103,46 @@ export const completionsRouter = router({
     .query(
       async ({ ctx, input }: { ctx: Context; input: GetAllByDateInput }) => {
         try {
+          const { teamId, date } = input;
+          if (!teamId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Team ID is required",
+            });
+          }
+          // const team = await ctx.prisma.team.findFirst({
+          //   where: {
+          //     id: teamId,
+          //   },
+          //   select: {
+          //     id: true,
+          //     name: true,
+          //     slug: true,
+          //     checkIns: true,
+          //     members: {
+          //       select: {
+          //         teamId: true,
+          //         userId: true,
+          //         role: true,
+          //         user: {
+          //           select: {
+          //             id: true,
+          //             name: true,
+          //             email: true,
+          //           },
+          //         },
+          //       },
+          //     },
+          //     bans: true,
+          //   },
+          // });
+          // if (!team) {
+          //   throw new TRPCError({
+          //     code: "NOT_FOUND",
+          //     message: "Team not found",
+          //   });
+          // }
+
           if (!ctx.userId) {
             throw new TRPCError({
               code: "UNAUTHORIZED",
@@ -108,8 +150,14 @@ export const completionsRouter = router({
             });
           }
 
+          const teamMembers = await getTeamMembers({
+            ctx,
+            teamId,
+            userId: ctx.userId,
+          });
+
           // Get all completions for the user on the specified date
-          const completions = await prisma.taskCompletion.findMany({
+          const completions = await ctx.prisma.taskCompletion.findMany({
             where: {
               completionDate: toISODateTime(input.date),
               task: {
@@ -141,7 +189,7 @@ export const completionsRouter = router({
             },
           });
 
-          return completions;
+          return { teamMembers, completions };
         } catch (error) {
           console.error("Error fetching completions:", error);
           if (error instanceof TRPCError) throw error;

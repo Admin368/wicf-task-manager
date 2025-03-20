@@ -19,6 +19,7 @@ import {
   Shield,
   ShieldOff,
   Ban,
+  LogOut,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -32,6 +33,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/trpc/client";
 import { useSession } from "next-auth/react";
+import { StarRating } from "@/components/ui/star-rating";
 
 interface TeamMember {
   id: string;
@@ -42,6 +44,8 @@ interface TeamMember {
   notes?: string | null;
   checkedInAt?: string | null;
   isBanned?: boolean;
+  rating?: number | null;
+  checkoutAt?: string | null;
 }
 
 interface UserListProps {
@@ -243,78 +247,91 @@ export function UserList({
                     {member.email}
                   </div>
                 )}
+                {showTime && member.checkedInAt && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Checked in at {format(new Date(member.checkedInAt), "h:mm a")}
+                  </div>
+                )}
+                {member.checkoutAt && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <LogOut className="h-3 w-3" />
+                    Checked out at {format(new Date(member.checkoutAt), "h:mm a")}
+                  </div>
+                )}
+                {member.rating && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <StarRating rating={member.rating} />
+                  </div>
+                )}
+                {member.notes && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {member.notes}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
+                {member.isBanned && (
+                  <Badge variant="destructive">
+                    Banned
+                  </Badge>
+                )}
                 <Badge
                   variant="secondary"
                   className={`flex items-center ${getRoleColor(member.role)}`}
                 >
                   {getRoleIcon(member.role)}
-                  {member.role
-                    ? member.role.charAt(0).toUpperCase() +
-                      member.role.slice(1)
-                    : "Member"}
+                  {member.role || "Member"}
                 </Badge>
-
-                {member.isBanned && (
-                  <Badge variant="destructive" className="flex items-center">
-                    <Ban className="h-3 w-3 mr-1" />
-                    Banned
-                  </Badge>
-                )}
-
-                {isAdmin && teamId && (
+                {isAdmin && member.id !== userId && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                      >
+                      <Button variant="ghost" size="icon">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleCopyId(member.id)}>
+                      <DropdownMenuItem
+                        onClick={() => handleCopyId(member.id)}
+                        className="cursor-pointer"
+                      >
                         <Copy className="h-4 w-4 mr-2" />
                         Copy ID
                       </DropdownMenuItem>
-
-                      {isAdmin && member.role !== "owner" && (
+                      {member.role !== "owner" && (
                         <>
-                          {member.role === "admin" ? (
-                            <DropdownMenuItem
-                              onClick={() => handleRoleChange(member.id, "member")}
-                              className="text-destructive"
-                            >
-                              <ShieldOff className="h-4 w-4 mr-2" />
-                              Remove Admin
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => handleRoleChange(member.id, "admin")}
-                            >
-                              <Shield className="h-4 w-4 mr-2" />
-                              Make Admin
-                            </DropdownMenuItem>
-                          )}
-                          {member.isBanned ? (
-                            <DropdownMenuItem
-                              onClick={() => handleUnbanUser(member.id)}
-                              className="text-green-600"
-                            >
-                              <Ban className="h-4 w-4 mr-2" />
-                              Unban User
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => handleBanUser(member.id)}
-                              className="text-destructive"
-                            >
-                              <Ban className="h-4 w-4 mr-2" />
-                              Ban User
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleRoleChange(
+                                member.id,
+                                member.role === "admin" ? "member" : "admin"
+                              )
+                            }
+                            className="cursor-pointer"
+                          >
+                            {member.role === "admin" ? (
+                              <>
+                                <ShieldOff className="h-4 w-4 mr-2" />
+                                Remove Admin
+                              </>
+                            ) : (
+                              <>
+                                <Shield className="h-4 w-4 mr-2" />
+                                Make Admin
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              member.isBanned
+                                ? handleUnbanUser(member.id)
+                                : handleBanUser(member.id)
+                            }
+                            className="cursor-pointer"
+                          >
+                            <Ban className="h-4 w-4 mr-2" />
+                            {member.isBanned ? "Unban User" : "Ban User"}
+                          </DropdownMenuItem>
                         </>
                       )}
                     </DropdownMenuContent>

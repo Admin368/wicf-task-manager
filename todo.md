@@ -45,3 +45,8 @@
 Email functionality {cm:2025-03-20}
 
 Launch Post
+
+#bug task completing not working
+Show assigned to me
+#bug toasts not working
+#bug Completed by Gone

@@ -3,12 +3,15 @@ import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
+import { getTeamMembers } from "./users";
+import { toISODateTime } from "./completions";
 
 export const tasksRouter = router({
   getByTeam: protectedProcedure
     .input(
       z.object({
         teamId: z.string().uuid(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -18,7 +21,7 @@ export const tasksRouter = router({
           where: {
             teamId_userId: {
               teamId: input.teamId,
-              userId: ctx.userId,
+              userId: ctx.userId!,
             },
           },
         });
@@ -30,21 +33,76 @@ export const tasksRouter = router({
           });
         }
 
+        // Get tasks with assignments
         const tasks = await ctx.prisma.task.findMany({
           where: {
             teamId: input.teamId,
             isDeleted: false,
           },
+          include: {
+            assignments: {
+              select: {
+                userId: true,
+              },
+            },
+          },
           orderBy: {
             position: "asc",
           },
         });
+        const teamMembers = await getTeamMembers({
+          ctx,
+          teamId: input.teamId,
+          userId: ctx.userId!,
+        });
+        const completions = await ctx.prisma.taskCompletion.findMany({
+          where: {
+            completionDate: toISODateTime(input.date),
+            task: {
+              team: {
+                members: {
+                  some: {
+                    userId: ctx.userId,
+                  },
+                },
+              },
+              isDeleted: false,
+            },
+          },
+          include: {
+            task: {
+              include: {
+                team: {
+                  include: {
+                    members: {
+                      include: {
+                        user: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            user: true,
+          },
+        });
 
-        return tasks;
+        const checkInStatus = await serverGetCheckInStatus({
+          ctx,
+          teamId: input.teamId,
+          date: input.date,
+        });
+
+        return {
+          teamMembers,
+          tasks,
+          completions,
+          checkInStatus,
+        };
       } catch (error) {
+        console.error("Error fetching tasks:", error);
         if (error instanceof TRPCError) throw error;
-        console.error("Error fetching team tasks:", error);
-        return [];
+        return null;
       }
     }),
 
@@ -60,7 +118,7 @@ export const tasksRouter = router({
         return [];
       }
 
-      const teamIds = memberships.map((m) => m.teamId);
+      const teamIds = memberships.map((m: { teamId: string }) => m.teamId);
 
       const tasks = await ctx.prisma.task.findMany({
         where: {
@@ -336,4 +394,89 @@ export const tasksRouter = router({
         throw error;
       }
     }),
+
+  assign: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().uuid(),
+        userId: z.string().uuid(),
+        isRemove: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { taskId, userId, isRemove } = input;
+
+      // Verify user has access to the task
+      const task = await ctx.prisma.task.findUnique({
+        where: { id: taskId },
+        include: { team: true },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Task not found",
+        });
+      }
+
+      // Verify user is a member of the team
+      const teamMember = await ctx.prisma.teamMember.findUnique({
+        where: {
+          teamId_userId: {
+            teamId: task.teamId,
+            userId: ctx.userId,
+          },
+        },
+      });
+
+      if (!teamMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this task",
+        });
+      }
+
+      // Verify user is admin
+      if (teamMember.role !== "admin" && teamMember.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can assign tasks",
+        });
+      }
+
+      // Create or update assignment
+      if (isRemove) {
+        await ctx.prisma.taskAssignment.delete({
+          where: {
+            taskId_userId: {
+              taskId,
+              userId,
+            },
+          },
+        });
+      } else {
+        await ctx.prisma.taskAssignment.upsert({
+          where: {
+            taskId_userId: {
+              taskId,
+              userId,
+            },
+          },
+          create: {
+            taskId,
+            userId,
+          },
+          update: {},
+        });
+      }
+
+      return { success: true };
+    }),
 });
+function serverGetCheckInStatus(arg0: {
+  ctx: { prisma: any; headers: Headers; userId: string };
+  teamId: string;
+  date: string;
+}) {
+  throw new Error("Function not implemented.");
+}

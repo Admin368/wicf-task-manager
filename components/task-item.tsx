@@ -13,7 +13,14 @@ import {
   GripVertical,
   ArrowUp,
   ArrowDown,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/trpc/client";
 import { useUser } from "./user-provider";
 import { cn } from "@/lib/utils";
@@ -21,6 +28,8 @@ import { toast } from "@/components/ui/use-toast";
 import { TaskCompletionModal } from "./task-completion-modal";
 import { format } from "date-fns";
 import { toast as sonnerToast } from "sonner";
+import { TaskAssignmentDialog } from "./task-assignment-dialog";
+
 interface TaskItemProps {
   task: {
     id: string;
@@ -28,6 +37,7 @@ interface TaskItemProps {
     parentId: string | null;
     position: number;
     teamId: string;
+    assignments?: { userId: string }[];
   };
   tasks: any[];
   completions: any[];
@@ -40,9 +50,12 @@ interface TaskItemProps {
   onMoveTask?: (taskId: string, direction: "up" | "down") => void;
   className?: string;
   refetchCompletions?: () => void;
+  refetchMembers?: () => void;
   dragHandleProps?: Record<string, any>;
   isAdmin?: boolean;
   hideTools?: boolean;
+  hideNotAssignedToMe?: boolean;
+  isCheckedIn: boolean;
 }
 
 export function TaskItem({
@@ -58,8 +71,11 @@ export function TaskItem({
   onMoveTask,
   className,
   refetchCompletions,
+  refetchMembers,
   isAdmin,
   hideTools,
+  hideNotAssignedToMe,
+  isCheckedIn,
 }: TaskItemProps) {
   const { userId } = useUser();
   const [expanded, setExpanded] = useState(true);
@@ -71,23 +87,6 @@ export function TaskItem({
   );
   const today = format(new Date(), "yyyy-MM-dd");
   const teamId = task.teamId;
-  const {
-    data: checkInStatus,
-    isLoading: checkingStatus,
-    refetch: refetchStatus,
-  } = api.checkIns.getUserCheckInStatus.useQuery({
-    teamId,
-    date: today,
-  },{
-    enabled: !!teamId,
-    retry: false,
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to get check-in status. Please refresh the page.",
-      });
-    },
-  });
 
   // Check if current user is admin
   // let isAdmin = teamMembers?.find(
@@ -216,129 +215,227 @@ export function TaskItem({
     }
   };
 
+  // Get assigned users
+  const assignedUsers =
+    task.assignments
+      ?.map((assignment) => {
+        const user = teamMembers.find(
+          (member) => member.id === assignment.userId
+        );
+        return user;
+      })
+      .filter(Boolean) || [];
+
+  const isThisTaskAssignedToMe = assignedUsers.some(
+    (user) => user.id === userId
+  );
+  if (!isThisTaskAssignedToMe && hideNotAssignedToMe) {
+    return null;
+  }
+
   return (
     <>
       <div className={className}>
         <div
           className={cn(
-            "flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors",
+            "flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors",
             isCompleted && "bg-muted/30"
           )}
           style={{ paddingLeft: `${(level + 1) * 12}px` }}
         >
-          <div className="flex items-center gap-2 flex-1">
-            {childTasks.length > 0 ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => setExpanded(!expanded)}
-              >
-                {expanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            ) : (
-              <div className="w-5" />
-            )}
-            <Checkbox
-              checked={isCompleted}
-              onCheckedChange={handleCheckboxChange}
-              className="data-[state=checked]:bg-green-600"
-            />
-            <span className="flex-1">{task.title}</span>
-            {completedBy && (
-              <span className="text-sm text-muted-foreground">
-                Completed by{" "}
-                {teamMembers.find((m) => m.id === completedBy)?.name}
-              </span>
-            )}
-          </div>
+          <div className="flex flex-col gap-1 flex-1">
+            <div className="flex items-start gap-2">
+              {childTasks.length > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 mt-0.5"
+                  onClick={() => setExpanded(!expanded)}
+                >
+                  {expanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              ) : (
+                <div className="w-5" />
+              )}
+              <Checkbox
+                checked={isCompleted}
+                onCheckedChange={handleCheckboxChange}
+                className="data-[state=checked]:bg-green-600 mt-0.5"
+              />
+              <span className="flex-1 leading-tight">{task.title}</span>
 
-          <div className="flex items-center gap-1">
-            {isAdmin && !hideTools && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 group-hover:opacity-100 "
-                  onClick={() => onEditTask?.(task)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 group-hover:opacity-100"
-                  onClick={() => onDeleteTask?.(task.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 group-hover:opacity-100"
-                  onClick={() => onAddSubtask?.(task.id)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                {onMoveTask && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 group-hover:opacity-100"
-                      onClick={() => onMoveTask(task.id, "up")}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 group-hover:opacity-100"
-                      onClick={() => onMoveTask(task.id, "down")}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </>
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  {hideTools ? (
+                    <>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <TaskAssignmentDialog
+                              taskId={task.id}
+                              teamId={task.teamId}
+                              currentAssigneeId={assignedUsers[0]?.id}
+                              teamMembers={teamMembers}
+                              taskAssignments={task.assignments}
+                              refetchMembers={refetchMembers}
+                            />
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onDeleteTask?.(task.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onAddSubtask?.(task.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Subtask
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {!isFirst && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onMoveTask?.(task.id, "up")}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {!isLast && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onMoveTask?.(task.id, "down")}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <TaskAssignmentDialog
+                        taskId={task.id}
+                        teamId={task.teamId}
+                        currentAssigneeId={assignedUsers[0]?.id}
+                        teamMembers={teamMembers}
+                        taskAssignments={task.assignments}
+                        refetchMembers={refetchMembers}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onEditTask?.(task)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onDeleteTask?.(task.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onAddSubtask?.(task.id)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      {!isFirst && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onMoveTask?.(task.id, "up")}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {!isLast && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onMoveTask?.(task.id, "down")}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {assignedUsers.length > 0 && (
+              <div className="flex gap-1 text-xs text-muted-foreground pl-7">
+                Assigned to:{" "}
+                {assignedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex gap-1 text-xs text-muted-foreground"
+                  >
+                    <span className="font-medium">{user.name},</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
-
-        {expanded && childTasks.length > 0 && (
-          <div>
-            {childTasks.map((childTask) => (
-              <TaskItem
-                key={childTask.id}
-                task={childTask}
-                tasks={tasks}
-                completions={completions}
-                teamMembers={teamMembers}
-                selectedDate={selectedDate}
-                level={level + 1}
-                onAddSubtask={onAddSubtask}
-                onEditTask={onEditTask}
-                onDeleteTask={onDeleteTask}
-                onMoveTask={onMoveTask}
-                refetchCompletions={refetchCompletions}
-                isAdmin={isAdmin}
-                hideTools={hideTools}
-              />
-            ))}
-          </div>
-        )}
       </div>
-
+      {expanded && childTasks.length > 0 && (
+        <div className="space-y-1">
+          {childTasks.map((childTask) => (
+            <TaskItem
+              key={childTask.id}
+              task={childTask}
+              tasks={tasks}
+              completions={completions}
+              teamMembers={teamMembers}
+              selectedDate={selectedDate}
+              level={level + 1}
+              onAddSubtask={onAddSubtask}
+              onEditTask={onEditTask}
+              onDeleteTask={onDeleteTask}
+              onMoveTask={onMoveTask}
+              refetchCompletions={refetchCompletions}
+              isAdmin={isAdmin}
+              hideTools={hideTools}
+            />
+          ))}
+        </div>
+      )}
       <TaskCompletionModal
         taskTitle={task.title}
         isOpen={showCompletionModal}
         isChecking={pendingCompletion}
         onConfirm={handleConfirmCompletion}
         onCancel={handleCancelCompletion}
+        // isCompleted={isCompleted}
       />
     </>
   );

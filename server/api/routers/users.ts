@@ -1,9 +1,84 @@
 import { z } from "zod";
-import { router, publicProcedure } from "@/lib/trpc/server";
+import { router, publicProcedure, Context } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { hashPassword } from "@/lib/auth";
+
+export const getTeamMembers = async ({
+  ctx,
+  teamId,
+  userId,
+  checkIfMember = true,
+}: {
+  ctx: Context;
+  teamId: string;
+  userId: string;
+  checkIfMember?: boolean;
+}) => {
+  // Get all team members with user details and ban status
+  const members = await ctx.prisma.teamMember.findMany({
+    where: {
+      teamId: teamId,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+  // Get ban status for all members
+  const bans = await ctx.prisma.teamBan.findMany({
+    where: {
+      teamId: teamId,
+    },
+    select: {
+      userId: true,
+    },
+  });
+
+  const bannedUserIds = new Set(
+    bans.map((ban: { userId: string }) => ban.userId)
+  );
+
+  if (checkIfMember) {
+    const isMember = members.some(
+      (member: { user: { id: string } }) => member.user.id === userId
+    );
+    if (!isMember) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You are not a member of this team",
+      });
+    }
+  }
+
+  // Transform the data to include role information and ban status
+  return members.map(
+    (member: {
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        avatarUrl: string | null;
+      };
+      role: string | null;
+    }) => ({
+      id: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      avatarUrl: member.user.avatarUrl,
+      role: member.role,
+      isBanned: bannedUserIds.has(member.user.id),
+    })
+  );
+};
 
 export const usersRouter = router({
   getAll: publicProcedure.query(async ({ ctx }) => {
@@ -42,45 +117,11 @@ export const usersRouter = router({
             message: "You don't have access to this team",
           });
         }
-
-        // Get all team members with user details and ban status
-        const members = await ctx.prisma.teamMember.findMany({
-          where: {
-            teamId: input.teamId,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                avatarUrl: true,
-              },
-            },
-          },
+        return await getTeamMembers({
+          ctx,
+          teamId: input.teamId,
+          userId: ctx.userId,
         });
-
-        // Get ban status for all members
-        const bans = await ctx.prisma.teamBan.findMany({
-          where: {
-            teamId: input.teamId,
-          },
-          select: {
-            userId: true,
-          },
-        });
-
-        const bannedUserIds = new Set(bans.map(ban => ban.userId));
-
-        // Transform the data to include role information and ban status
-        return members.map((member: { user: { id: string; name: string; email: string; avatarUrl: string | null }; role: string | null }) => ({
-          id: member.user.id,
-          name: member.user.name,
-          email: member.user.email,
-          avatarUrl: member.user.avatarUrl,
-          role: member.role,
-          isBanned: bannedUserIds.has(member.user.id),
-        }));
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error("Error fetching team members:", error);
@@ -344,3 +385,9 @@ export const usersRouter = router({
     }
   }),
 });
+function getMembers(arg0: {
+  ctx: { prisma: any; headers: Headers; userId: string };
+  teamId: string;
+}): any {
+  throw new Error("Function not implemented.");
+}

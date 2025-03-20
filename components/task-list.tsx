@@ -14,6 +14,14 @@ import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Task } from "@prisma/client";
 
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string | null;
+  avatarUrl: string | null;
+  role: string | null;
+}
+
 export function TaskList({
   teamId,
   teamName,
@@ -29,7 +37,9 @@ export function TaskList({
   const [showUserList, setShowUserList] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hideTools, setHideTools] = useState(false);
+  const [hideTools, setHideTools] = useState(true);
+  const [showAssignedToMe, setShowAssignedToMe] = useState(false);
+  const today = format(new Date(), "yyyy-MM-dd");
 
   // Add team member query to check admin status
   // const { data: teamMember } = api.teams.getMember.useQuery(
@@ -41,11 +51,12 @@ export function TaskList({
 
   // Fetch tasks and completions for the specific team
   const {
-    data: tasks,
+    data,
     isLoading: isLoadingTasks,
     error: tasksError,
+    refetch: refetchTasks,
   } = api.tasks.getByTeam.useQuery(
-    { teamId },
+    { teamId, date: formattedDate },
     {
       onError: (err) => {
         console.error("Error fetching tasks:", err);
@@ -54,42 +65,28 @@ export function TaskList({
     }
   );
 
-  const {
-    data: completions,
-    isLoading: isLoadingCompletions,
-    error: completionsError,
-    refetch: refetchCompletions,
-  } = api.completions.getAllByDate.useQuery(
-    { date: formattedDate },
-    {
-      refetchInterval: 5000,
-      refetchOnWindowFocus: true,
-      onError: (err) => {
-        console.error("Error fetching completions:", err);
-        setError(
-          "Failed to load task completions. Please try refreshing the page."
-        );
-      },
-    }
-  );
+  const { teamMembers, completions, tasks, checkInStatus } = data || {};
+  // const teamMembers = team?.members || [];
+  console.log("teamMembers", teamMembers);
 
   // Fetch team members instead of all users
-  const {
-    data: teamMembers,
-    isLoading: isLoadingMembers,
-    error: membersError,
-    refetch: refetchMembers,
-  } = api.users.getTeamMembers.useQuery(
-    { teamId },
-    {
-      onError: (err) => {
-        console.error("Error fetching team members:", err);
-        setError(
-          "Failed to load team members. Please try refreshing the page."
-        );
-      },
-    }
-  );
+  // const {
+  //   data: teamMembers2,
+  //   isLoading: isLoadingMembers,
+  //   error: membersError,
+  //   refetch: refetchMembers,
+  // } = api.users.getTeamMembers.useQuery(
+  //   { teamId },
+  //   {
+  //     onError: (err) => {
+  //       console.error("Error fetching team members:", err);
+  //       setError(
+  //         "Failed to load team members. Please try refreshing the page."
+  //       );
+  //     },
+  //   }
+  // );
+  // console.log("teamMembers2", teamMembers2);
 
   // Mutations
   const createTask = api.tasks.create.useMutation({
@@ -113,7 +110,7 @@ export function TaskList({
     },
   });
 
-  const utils = api.useContext();
+  // const utils = api.useContext();
 
   // Get top-level tasks
   const topLevelTasks =
@@ -138,7 +135,8 @@ export function TaskList({
         teamId,
       });
 
-      utils.tasks.getByTeam.invalidate({ teamId });
+      // utils.tasks.getByTeam.invalidate({ teamId });
+      refetchTasks?.();
       setShowTaskDialog(false);
     } catch (error) {
       console.error("Failed to create task:", error);
@@ -163,7 +161,8 @@ export function TaskList({
         parentId: data.parentId,
       });
 
-      utils.tasks.getByTeam.invalidate({ teamId });
+      // utils.tasks.getByTeam.invalidate({ teamId });
+      refetchTasks?.();
       setEditingTask(null);
       setShowTaskDialog(false);
     } catch (error) {
@@ -184,7 +183,8 @@ export function TaskList({
     try {
       setError(null);
       await deleteTask.mutateAsync({ id: taskId });
-      utils.tasks.getByTeam.invalidate({ teamId });
+      // utils.tasks.getByTeam.invalidate({ teamId });
+      refetchTasks?.();
     } catch (error) {
       console.error("Failed to delete task:", error);
     }
@@ -243,7 +243,8 @@ export function TaskList({
       });
 
       // Invalidate tasks query to refresh the list
-      utils.tasks.getByTeam.invalidate({ teamId });
+      // utils.tasks.getByTeam.invalidate({ teamId });
+      refetchTasks?.();
     } catch (error) {
       console.error("Error moving task:", error);
       setError("Failed to move task. Please try again.");
@@ -275,31 +276,31 @@ export function TaskList({
     return Math.floor(beforePosition + (afterPosition - beforePosition) / 2);
   };
 
-  const renderTasks = (tasks: Task[], level = 0) => {
-    return tasks.map((task) => (
-      <div key={task.id}>
-        <TaskItem
-          task={task}
-          tasks={tasks}
-          completions={completions || []}
-          teamMembers={teamMembers || []}
-          selectedDate={formattedDate}
-          level={level}
-          onAddSubtask={handleAddSubtask}
-          onEditTask={handleEditTask}
-          onDeleteTask={handleDeleteTask}
-          onMoveTask={handleMoveTask}
-          refetchCompletions={refetchCompletions}
-          isAdmin={isAdmin}
-        />
-        {task.subtasks && task.subtasks.length > 0 && (
-          <div className="ml-6 mt-2">
-            {renderTasks(task.subtasks, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
-  };
+  // const renderTasks = (tasks: Task[], level = 0) => {
+  //   return tasks.map((task) => (
+  //     <div key={task.id}>
+  //       <TaskItem
+  //         task={task}
+  //         tasks={tasks}
+  //         completions={completions || []}
+  //         teamMembers={teamMembers || []}
+  //         selectedDate={formattedDate}
+  //         level={level}
+  //         onAddSubtask={handleAddSubtask}
+  //         onEditTask={handleEditTask}
+  //         onDeleteTask={handleDeleteTask}
+  //         onMoveTask={handleMoveTask}
+  //         refetchCompletions={refetchCompletions}
+  //         isAdmin={isAdmin}
+  //       />
+  //       {task.subtasks && task.subtasks.length > 0 && (
+  //         <div className="ml-6 mt-2">
+  //           {renderTasks(task.subtasks, level + 1)}
+  //         </div>
+  //       )}
+  //     </div>
+  //   ));
+  // };
 
   if (!userId) {
     return (
@@ -309,7 +310,7 @@ export function TaskList({
     );
   }
 
-  if (isLoadingTasks || isLoadingCompletions || isLoadingMembers) {
+  if (isLoadingTasks || isLoadingCompletions) {
     return (
       <div className="space-y-2">
         <Skeleton className="h-12 w-full" />
@@ -342,26 +343,21 @@ export function TaskList({
           </Alert>
         )}
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <DatePicker
-              date={selectedDate}
-              onDateChange={handleDateChange}
-            />
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setEditingTask(null);
-                  setShowTaskDialog(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
-              </Button>
-            )}
-          </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
+          <DatePicker date={selectedDate} onDateChange={handleDateChange} />
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingTask(null);
+                setShowTaskDialog(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
+          )}
 
           <Button
             variant="outline"
@@ -378,25 +374,26 @@ export function TaskList({
             teamId={teamId}
             teamMembers={teamMembers}
             onClose={() => setShowUserList(false)}
-            refetch={refetchMembers}
+            refetch={refetchCompletions}
           />
         )}
 
-        <div className="border rounded-md">
+        <div className="border rounded-md flex flex-col">
           <div className="p-4 border-b bg-muted/50">
             <h2 className="font-semibold">
               Tasks for {format(selectedDate, "MMMM d, yyyy")}
             </h2>
           </div>
-          <div className="p-4 border-b bg-muted/50 flex gap-2">
+          <div className="p-4 border-b bg-muted/50 flex gap-2 flex flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 refetchCompletions?.();
               }}
+              disabled={isLoadingCompletions}
             >
-              Refresh
+              {isLoadingCompletions ? "Refreshing..." : "Refresh"}
             </Button>
             <Button
               variant="outline"
@@ -408,9 +405,18 @@ export function TaskList({
             >
               {hideTools ? "Show Task Tools" : "Hide Task Tools"}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAssignedToMe(!showAssignedToMe)}
+            >
+              {showAssignedToMe ? "Show All Tasks" : "Show Only Assigned to Me"}
+            </Button>
           </div>
-
-          <div className="p-2">
+          <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground">
+            {"You must be checked in to complete tasks"}
+          </div>
+          <div className="">
             {isLoadingTasks || isLoadingCompletions ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -453,8 +459,10 @@ export function TaskList({
                         onDeleteTask={handleDeleteTask}
                         onMoveTask={handleMoveTask}
                         refetchCompletions={refetchCompletions}
+                        refetchMembers={refetchCompletions}
                         isAdmin={isAdmin}
                         hideTools={hideTools}
+                        hideNotAssignedToMe={showAssignedToMe}
                       />
                     ))}
                   </div>
