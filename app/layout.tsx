@@ -15,7 +15,8 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   metadataBase: new URL("https://checklist.maravian.com"),
   title: "Maravian Checklist",
-  description: "Track team tasks in real-time",
+  description:
+    "Realtime collaborative checklist for teams and individual on recurring tasks of event plan execution",
   icons: {
     icon: "https://maravianwebservices.com/images/photos/maravian/favicon.png", // For browsers
     apple:
