@@ -2,11 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect } from "react";
-import { api } from "@/lib/trpc/client";
+import { useEffect, useState } from "react";
 
 export default function BannedPage() {
   const { data: session, status } = useSession();
+  const [isBanned, setIsBanned] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -14,19 +14,35 @@ export default function BannedPage() {
     }
   }, [status]);
 
-  const { data: user } = api.users.me.useQuery(undefined, {
-    enabled: !!session?.user?.email,
-  });
+  useEffect(() => {
+    async function checkBanStatus() {
+      if (session?.user?.email) {
+        const response = await fetch("/api/auth/check-banned", {
+          headers: {
+            "x-user-email": session.user.email,
+          },
+        });
+        const data = await response.json();
+        setIsBanned(data.isBanned);
+      }
+    }
+
+    checkBanStatus();
+  }, [session?.user?.email]);
 
   useEffect(() => {
-    if (user && !user.isBanned) {
+    if (isBanned === false) {
       redirect("/");
     }
-  }, [user]);
+  }, [isBanned]);
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/login" });
   };
+
+  if (isBanned === null) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -39,7 +55,8 @@ export default function BannedPage() {
             Your account has been banned from accessing this application.
           </p>
           <p className="mt-2 text-sm text-gray-600">
-            If you believe this is a mistake, please contact your team administrator.
+            If you believe this is a mistake, please contact your team
+            administrator.
           </p>
         </div>
         <div className="mt-8">
@@ -53,4 +70,4 @@ export default function BannedPage() {
       </div>
     </div>
   );
-} 
+}

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { middleware, publicProcedure } from "@/lib/trpc/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth";
 
 const isAuthed = middleware(async (opts) => {
   const session = await getServerSession(authOptions);

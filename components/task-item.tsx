@@ -40,14 +40,14 @@ interface TaskItemProps {
   tasks: serverGetTasksReturnType[];
   completions: serverGetCompletionsReturnType[];
   teamMembers: serverGetTeamMembersReturnType[];
-  selectedDate: Date;
+  selectedDate: string | Date;
   level?: number;
   onAddSubtask?: (parentId: string) => void;
   onEditTask?: (task: serverGetTasksReturnType) => void;
   onDeleteTask?: (taskId: string) => void;
   onMoveTask?: (taskId: string, direction: "up" | "down") => void;
   className?: string;
-  refetch: () => void;
+  refetch?: () => void;
   dragHandleProps?: Record<string, any>;
   isAdmin?: boolean;
   hideTools?: boolean;
@@ -68,6 +68,7 @@ export function TaskItem({
   onMoveTask,
   className,
   refetch,
+  dragHandleProps,
   isAdmin,
   hideTools,
   hideNotAssignedToMe,

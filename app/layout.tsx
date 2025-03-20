@@ -13,9 +13,16 @@ import { Toaster as SonnerToaster } from "sonner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://checklist.maravian.com"),
   title: "Maravian Checklist",
   description: "Track team tasks in real-time",
-  generator: "v0.dev",
+  icons: {
+    icon: "https://maravianwebservices.com/images/photos/maravian/favicon.png", // For browsers
+    apple:
+      "https://maravianwebservices.com/images/photos/maravian/apple-touch-icon.png", // Apple devices
+    shortcut:
+      "https://maravianwebservices.com/images/photos/maravian/favicon-32x32.png", // Optional shortcut icon
+  },
 };
 
 export default function RootLayout({

@@ -21,7 +21,7 @@ export const env = createEnv({
   },
 
   client: {
-    // NEXT_PUBLIC_APP_URL: z.string().url(),
+    NEXT_PUBLIC_APP_URL: z.string().url(),
     NEXT_PUBLIC_NAME: z.string().min(1),
   },
 
@@ -42,7 +42,7 @@ export const env = createEnv({
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
 
     // Public variables
-    // NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXTAUTH_URL,
     NEXT_PUBLIC_NAME: process.env.NEXT_PUBLIC_NAME,
   },
 

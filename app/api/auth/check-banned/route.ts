@@ -23,12 +23,15 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ 
-      isBanned: user?.teamBans.length > 0 || false,
-      bannedTeams: user?.teamBans.map((ban: TeamBan & { team: { slug: string } }) => ({
-        id: ban.teamId,
-        slug: ban.team.slug,
-      })) || []
+    return NextResponse.json({
+      isBanned: (user?.teamBans && user.teamBans.length > 0) || false,
+      bannedTeams:
+        (user?.teamBans &&
+          user.teamBans.map((ban: TeamBan & { team: { slug: string } }) => ({
+            id: ban.teamId,
+            slug: ban.team.slug,
+          }))) ||
+        [],
     });
   }
 
@@ -54,11 +57,14 @@ export async function GET(request: Request) {
     },
   });
 
-  return NextResponse.json({ 
-    isBanned: user?.teamBans.length > 0 || false,
-    bannedTeams: user?.teamBans.map((ban: TeamBan) => ({
-      id: ban.teamId,
-      slug: teamSlug,
-    })) || []
+  return NextResponse.json({
+    isBanned: (user?.teamBans && user.teamBans.length > 0) || false,
+    bannedTeams:
+      (user?.teamBans &&
+        user.teamBans.map((ban: TeamBan) => ({
+          id: ban.teamId,
+          slug: teamSlug,
+        }))) ||
+      [],
   });
-} 
+}

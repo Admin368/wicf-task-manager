@@ -22,3 +22,5 @@ export async function verifyPassword(
   )) as Buffer;
   return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
 }
+
+export { authOptions } from "@/app/api/auth/auth.config";

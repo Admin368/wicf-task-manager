@@ -5,5 +5,6 @@ export interface Task {
   position: number;
   teamId: string | null;
   isDeleted: boolean;
-  createdAt: string | Date | null;
+  createdAt: Date | null;
+  assignments: { userId: string }[];
 }
