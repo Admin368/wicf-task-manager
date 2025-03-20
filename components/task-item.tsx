@@ -49,8 +49,7 @@ interface TaskItemProps {
   onDeleteTask?: (taskId: string) => void;
   onMoveTask?: (taskId: string, direction: "up" | "down") => void;
   className?: string;
-  refetchCompletions?: () => void;
-  refetchMembers?: () => void;
+  refetch: () => void;
   dragHandleProps?: Record<string, any>;
   isAdmin?: boolean;
   hideTools?: boolean;
@@ -70,8 +69,7 @@ export function TaskItem({
   onDeleteTask,
   onMoveTask,
   className,
-  refetchCompletions,
-  refetchMembers,
+  refetch,
   isAdmin,
   hideTools,
   hideNotAssignedToMe,
@@ -179,7 +177,7 @@ export function TaskItem({
       });
 
       // Refetch to ensure data consistency
-      refetchCompletions?.();
+      refetch?.();
     } catch (error) {
       console.error("Failed to toggle completion:", error);
       // Reset UI state
@@ -291,7 +289,7 @@ export function TaskItem({
                                 currentAssigneeId={assignedUsers[0]?.id}
                                 teamMembers={teamMembers}
                                 taskAssignments={task.assignments}
-                                refetchMembers={refetchMembers}
+                                refetchMembers={refetch}
                               />
                             )}
                           </DropdownMenuItem>
@@ -313,16 +311,15 @@ export function TaskItem({
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      {!isFirst && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onMoveTask?.(task.id, "up")}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onMoveTask?.(task.id, "up")}
+                        disabled={isFirst}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
                       {!isLast && (
                         <Button
                           variant="ghost"
@@ -343,7 +340,7 @@ export function TaskItem({
                           currentAssigneeId={assignedUsers[0]?.id}
                           teamMembers={teamMembers}
                           taskAssignments={task.assignments}
-                          refetchMembers={refetchMembers}
+                          refetchMembers={refetch}
                         />
                       )}
                       <Button
@@ -437,7 +434,7 @@ export function TaskItem({
               onEditTask={onEditTask}
               onDeleteTask={onDeleteTask}
               onMoveTask={onMoveTask}
-              refetchCompletions={refetchCompletions}
+              refetch={refetch}
               isAdmin={isAdmin}
               hideTools={hideTools}
               isCheckedIn={isCheckedIn}

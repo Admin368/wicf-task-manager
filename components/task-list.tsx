@@ -41,23 +41,20 @@ export function TaskList({
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
 
-  // Add team member query to check admin status
-  // const { data: teamMember } = api.teams.getMember.useQuery(
-  //   { teamId, userId: userId || "" },
-  //   { enabled: !!userId }
-  // );
-
   const formattedDate = selectedDate.toISOString().split("T")[0];
 
   // Fetch tasks and completions for the specific team
   const {
     data,
     isLoading,
+    isRefetching,
     error: tasksError,
     refetch,
   } = api.tasks.getByTeam.useQuery(
     { teamId, date: formattedDate },
     {
+      enabled: !!userId,
+      refetchInterval: 10000,
       onError: (err) => {
         console.error("Error fetching tasks:", err);
         setError("Failed to load tasks. Please try refreshing the page.");
@@ -66,27 +63,6 @@ export function TaskList({
   );
 
   const { teamMembers, completions, tasks, checkInStatus } = data || {};
-  // const teamMembers = team?.members || [];
-  console.log("teamMembers", teamMembers);
-
-  // Fetch team members instead of all users
-  // const {
-  //   data: teamMembers2,
-  //   isLoading: isLoadingMembers,
-  //   error: membersError,
-  //   refetch: refetchMembers,
-  // } = api.users.getTeamMembers.useQuery(
-  //   { teamId },
-  //   {
-  //     onError: (err) => {
-  //       console.error("Error fetching team members:", err);
-  //       setError(
-  //         "Failed to load team members. Please try refreshing the page."
-  //       );
-  //     },
-  //   }
-  // );
-  // console.log("teamMembers2", teamMembers2);
 
   // Mutations
   const createTask = api.tasks.create.useMutation({
@@ -279,32 +255,6 @@ export function TaskList({
     return Math.floor(beforePosition + (afterPosition - beforePosition) / 2);
   };
 
-  // const renderTasks = (tasks: Task[], level = 0) => {
-  //   return tasks.map((task) => (
-  //     <div key={task.id}>
-  //       <TaskItem
-  //         task={task}
-  //         tasks={tasks}
-  //         completions={completions || []}
-  //         teamMembers={teamMembers || []}
-  //         selectedDate={formattedDate}
-  //         level={level}
-  //         onAddSubtask={handleAddSubtask}
-  //         onEditTask={handleEditTask}
-  //         onDeleteTask={handleDeleteTask}
-  //         onMoveTask={handleMoveTask}
-  //         refetchCompletions={refetchCompletions}
-  //         isAdmin={isAdmin}
-  //       />
-  //       {task.subtasks && task.subtasks.length > 0 && (
-  //         <div className="ml-6 mt-2">
-  //           {renderTasks(task.subtasks, level + 1)}
-  //         </div>
-  //       )}
-  //     </div>
-  //   ));
-  // };
-
   if (!userId) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -391,16 +341,6 @@ export function TaskList({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                refetch?.();
-              }}
-              disabled={isLoading}
-            >
-              {isLoading ? "Refreshing..." : "Refresh"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               disabled={!isAdmin}
               onClick={() => {
                 setHideTools(!hideTools);
@@ -415,12 +355,22 @@ export function TaskList({
             >
               {showAssignedToMe ? "Show All Tasks" : "Show Only Assigned to Me"}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                refetch?.();
+              }}
+              disabled={isLoading || isRefetching}
+            >
+              {isLoading || isRefetching ? "Refreshing..." : "Refresh"}
+            </Button>
           </div>
-          <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground">
-            {checkInStatus?.checkedIn
-              ? "You must be checked in to complete tasks"
-              : "You are not checked in"}
-          </div>
+          {!checkInStatus?.checkedIn && (
+            <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground">
+              You must be checked in to complete tasks
+            </div>
+          )}
           <div className="">
             {isLoading ? (
               <div className="space-y-2">
