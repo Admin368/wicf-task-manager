@@ -2,8 +2,20 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Users, Calendar, ChevronDown, ChevronUp, LogOut } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Loader2,
+  Users,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  LogOut,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { api } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { UserList } from "@/components/user-list";
@@ -11,6 +23,7 @@ import { toast } from "@/components/ui/use-toast";
 import { CheckoutDialog } from "./checkout-dialog";
 import { StarRating } from "./star-rating";
 import { useSession } from "next-auth/react";
+import { UserListCheckIns } from "./user-list-checkins";
 interface CheckInStatusBarProps {
   teamId: string;
   totalMembers: number;
@@ -32,11 +45,14 @@ interface CheckIn {
   };
 }
 
-export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps) {
+export function CheckInStatusBar({
+  teamId,
+  totalMembers,
+}: CheckInStatusBarProps) {
   const { data: session } = useSession();
   const [showCheckedInUsers, setShowCheckedInUsers] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
-  
+
   const { data: checkIns, isLoading } = api.checkIns.getByTeamAndDate.useQuery(
     {
       teamId,
@@ -44,7 +60,8 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
     },
     {
       enabled: !!teamId,
-      retry: false,
+      // retry: false,
+      refetchInterval: 1000 * 60 * 1, // ms * sec * min
       onError: (error) => {
         toast({
           title: "Error",
@@ -56,16 +73,25 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
   );
 
   const checkedInCount = checkIns?.length || 0;
-  const checkedOutCount = checkIns?.filter(c => c.checkoutAt)?.length || 0;
-  const percentage = totalMembers > 0 ? Math.round((checkedInCount / totalMembers) * 100) : 0;
-  const checkoutPercentage = checkedInCount > 0 ? Math.round((checkedOutCount / checkedInCount) * 100) : 0;
+  const checkedOutCount = checkIns?.filter((c) => c.checkoutAt)?.length || 0;
+  const percentage =
+    totalMembers > 0 ? Math.round((checkedInCount / totalMembers) * 100) : 0;
+  const checkoutPercentage =
+    checkedInCount > 0
+      ? Math.round((checkedOutCount / checkedInCount) * 100)
+      : 0;
 
   // Get current user's check-in
-  const currentUserCheckIn = checkIns?.find(c => c.userId === session?.user?.id);
+  const currentUserCheckIn = checkIns?.find(
+    (c) => c.userId === session?.user?.id
+  );
 
   return (
     <>
-      <Card className="hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setShowCheckedInUsers(true)}>
+      <Card
+        className="hover:bg-accent/50 cursor-pointer transition-colors"
+        onClick={() => setShowCheckedInUsers(true)}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -94,14 +120,16 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
               )}
             </div>
           </div>
-          
+
           <div className="mt-4 w-full bg-secondary h-2 rounded-full overflow-hidden">
             <div
               className={cn(
                 "h-full rounded-full transition-all",
-                percentage >= 75 ? "bg-green-500" :
-                percentage >= 50 ? "bg-amber-500" :
-                "bg-red-500"
+                percentage >= 75
+                  ? "bg-green-500"
+                  : percentage >= 50
+                  ? "bg-amber-500"
+                  : "bg-red-500"
               )}
               style={{ width: `${percentage}%` }}
             />
@@ -136,27 +164,19 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
             </div>
           ) : checkIns && checkIns.length > 0 ? (
             <div className="max-h-96 overflow-y-auto">
-              <UserList teamMembers={checkIns.map((c: CheckIn) => ({ 
-                id: c.userId,
-                name: c.user.name || 'Unknown',
-                email: c.user.email,
-                avatar_url: c.user.avatar_url,
-                role: 'member',
-                notes: c.notes,
-                checkedInAt: c.checkedInAt,
-                rating: c.rating,
-                checkoutAt: c.checkoutAt
-              }))} 
-              onClose={() => setShowCheckedInUsers(false)} 
-              showTime
-              teamId={teamId} />
+              <UserListCheckIns
+                checkIns={checkIns}
+                onClose={() => setShowCheckedInUsers(false)}
+                showTime
+                teamId={teamId}
+              />
             </div>
           ) : (
             <div className="py-8 text-center text-muted-foreground">
               <p>No team members have checked in today.</p>
             </div>
           )}
-          
+
           <div className="flex justify-end">
             <Button
               variant="outline"
@@ -170,4 +190,4 @@ export function CheckInStatusBar({ teamId, totalMembers }: CheckInStatusBarProps
       </Dialog>
     </>
   );
-} 
+}
