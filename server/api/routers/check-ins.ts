@@ -230,10 +230,10 @@ export const checkInsRouter = router({
         // Get daily check-in counts for the past X days
         const checkInCounts = await prisma.$queryRaw`
           SELECT 
-            DATE(check_in_date) as check_in_date,
+            DATE(check_in_date)::text as check_in_date,
             COUNT(*) as check_in_count
           FROM check_ins
-          WHERE team_id = ${input.teamId}
+          WHERE team_id = ${input.teamId}::uuid
           GROUP BY DATE(check_in_date)
           ORDER BY DATE(check_in_date) DESC
           LIMIT ${input.limit}
