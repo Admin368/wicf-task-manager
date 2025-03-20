@@ -2,9 +2,8 @@ import { z } from "zod";
 import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
-import { Prisma } from "@prisma/client";
 import { serverGetTeamMembers } from "./users";
-import { toISODateTime } from "./completions";
+import { toISODateTime } from "./check-ins";
 import { serverGetCheckInStatus } from "./check-ins";
 import { prisma } from "@/lib/prisma";
 

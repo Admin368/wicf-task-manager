@@ -1,6 +1,6 @@
 # Feature List
 
-- ## v1 - MVP no Auth {cm:2025-03-20}
+- ## v1 - MVP no Auth {cm:2025-03-20} {c}
 
   - Refresh on login {cm:2025-03-20}
   - full width for modbile {cm:2025-03-20}
@@ -9,7 +9,7 @@
   - team admin {cm:2025-03-20}
   - team password {cm:2025-03-20}
 
-- ## V2 - Refactor With Prisma and Auth
+- ## V2 - Refactor With Prisma and Auth {c} {cm:2025-03-21}
 
   - Home page tabs, search Teams, Joined teams {cm:2025-03-20}
   - Team slug on home page {cm:2025-03-20}
@@ -19,34 +19,36 @@
   - footer {cm:2025-03-20}
   - on arrived on no accessed team enter password to join {cm:2025-03-20}
   - /account reform {cm:2025-03-20}
-  - forgot password functionality
-  - Delete functionality
-    - teams
-    - team members
-    - tasks
+  - forgot password functionality {cm:2025-03-21}
+  - Delete functionality {cm:2025-03-21}
+    - teams {cm:2025-03-21}
+    - ban team member {cm:2025-03-21}
+    - tasks {cm:2025-03-21}
   - Clone Team (Admin can make team available for cloning, then on make page people can clone their own copy of same checklist)
-  - Day Assignment to members by admin
-  - Delete Team by admin
-  - Dont allow task ticking before checkedin
-  - Add Done for the Day( Checkout button functionality)
+  - Task Assignment to members by admin {cm:2025-03-21}
+  - Delete Team by admin {cm:2025-03-21}
+  - Dont allow task ticking before checkedin {cm:2025-03-21}
+  - Add Done for the Day( Checkout button functionality) {cm:2025-03-21}
 
-    - checkout time
-    - rate how the day was put of 5 stars
-    - write notes
+    - checkout time {cm:2025-03-21}
+    - rate how the day was put of 5 stars {cm:2025-03-21}
+    - write notes {cm:2025-03-21}
     - add it on the tabs on team page
     - checkout history with notes (so can be used as summary) and overal rating
 
   - If teams already Joined no need for password {cm:2025-03-20}
-  - UserList Broken
-  - Front End dont allow Tick if not checked in
+  - UserList Broken {cm:2025-03-21}
+  - Front End dont allow Tick if not checked in {cm:2025-03-21}
 
-/account update details from DB
+/account update details from DB {cm:2025-03-21}
 
 Email functionality {cm:2025-03-20}
 
 Launch Post
 
-#bug task completing not working
-Show assigned to me
-#bug toasts not working
-#bug Completed by Gone
+#bug task completing not working {cm:2025-03-21}
+Show assigned to me {cm:2025-03-21}
+#bug toasts not working {cm:2025-03-21}
+#bug Completed not showing {cm:2025-03-21}
+
+Assignment per Day

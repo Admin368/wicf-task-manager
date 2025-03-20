@@ -9,8 +9,6 @@ import {
   Plus,
   ChevronRight,
   ChevronDown,
-  AlertCircle,
-  GripVertical,
   ArrowUp,
   ArrowDown,
   MoreVertical,
@@ -42,7 +40,7 @@ interface TaskItemProps {
   tasks: serverGetTasksReturnType[];
   completions: serverGetCompletionsReturnType[];
   teamMembers: serverGetTeamMembersReturnType[];
-  selectedDate: string;
+  selectedDate: Date;
   level?: number;
   onAddSubtask?: (parentId: string) => void;
   onEditTask?: (task: serverGetTasksReturnType) => void;
@@ -172,7 +170,7 @@ export function TaskItem({
       await toggleCompletion.mutateAsync({
         taskId: task.id,
         userId: userId!,
-        date: selectedDate,
+        date: format(selectedDate, "yyyy-MM-dd"),
         completed: checked,
       });
 
@@ -393,12 +391,15 @@ export function TaskItem({
             {assignedUsers.length > 0 && (
               <div className="flex gap-1 text-xs text-muted-foreground pl-7">
                 Assigned to:{" "}
-                {assignedUsers.map((user) => (
+                {assignedUsers.map((user, index) => (
                   <div
                     key={user?.id}
                     className="flex gap-1 text-xs text-muted-foreground"
                   >
-                    <span className="font-medium">{user?.name},</span>
+                    <span className="font-medium">
+                      {user?.id === userId ? "Me" : user?.name}
+                      {index < assignedUsers.length - 1 && ","}
+                    </span>
                   </div>
                 ))}
               </div>

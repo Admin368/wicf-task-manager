@@ -41,8 +41,9 @@ export function TaskList({
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
   // const today = format(new Date(), "yyyy-MM-dd");
 
-  const formattedDate = selectedDate.toISOString().split("T")[0];
-
+  // const formattedDate = selectedDate.toISOString().split("T")[0];
+  const formattedDate = format(selectedDate, "yyyy-MM-dd");
+  console.log({ formattedDate });
   // Fetch tasks and completions for the specific team
   const {
     data,
@@ -408,7 +409,7 @@ export function TaskList({
                         tasks={tasks || []}
                         completions={completions || []}
                         teamMembers={teamMembers || []}
-                        selectedDate={selectedDate.toISOString().split("T")[0]}
+                        selectedDate={selectedDate}
                         onAddSubtask={handleAddSubtask}
                         onEditTask={onEditTask}
                         onDeleteTask={handleDeleteTask}

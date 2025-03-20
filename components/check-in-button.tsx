@@ -25,13 +25,11 @@ interface CheckInButtonProps {
 
 export function CheckInButton({
   teamId,
-  checkIns,
   refetch,
   isCheckedIn,
 }: CheckInButtonProps) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
-  const router = useRouter();
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -76,7 +74,7 @@ export function CheckInButton({
         setOpen(false);
         setNotes("");
         refetch();
-        router.refresh();
+        window.location.reload();
       },
       onError: (error) => {
         toast({

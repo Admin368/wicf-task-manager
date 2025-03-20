@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, Context } from "@/lib/trpc/server";
+import { router, Context } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
@@ -75,7 +75,7 @@ export type serverGetCheckInsReturnType = Awaited<
 >[number];
 
 // Helper function to convert date string to ISO DateTime
-function toISODateTime(dateStr: string) {
+export function toISODateTime(dateStr: string) {
   const date = new Date(dateStr);
   date.setUTCHours(0, 0, 0, 0);
   return date;
@@ -134,12 +134,20 @@ export async function serverGetCheckInStatus({
   teamId: string;
   date: string;
 }) {
+  const userId = ctx.userId;
+  const checkInDate = toISODateTime(date).toISOString(); // yyyy-mm-dd
+  if (!userId || !teamId || !checkInDate) {
+    return {
+      checkedIn: false,
+      checkInDetails: null,
+    };
+  }
   const checkIn = await prisma.checkIn.findUnique({
     where: {
       teamId_userId_checkInDate: {
         teamId: teamId,
-        userId: ctx.userId!,
-        checkInDate: toISODateTime(date),
+        userId: userId,
+        checkInDate: checkInDate,
       },
     },
     include: {
@@ -303,11 +311,12 @@ export const checkInsRouter = router({
         }
 
         // Create the check-in
+        const date = toISODateTime(input.date);
         const checkIn = await prisma.checkIn.create({
           data: {
             teamId: input.teamId,
             userId: ctx.userId!,
-            checkInDate: toISODateTime(input.date),
+            checkInDate: date,
             notes: input.notes,
           },
         });

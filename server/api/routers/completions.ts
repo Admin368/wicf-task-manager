@@ -1,17 +1,11 @@
 import { z } from "zod";
-import { router, publicProcedure } from "@/lib/trpc/server";
+import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 import type { Context } from "@/lib/trpc/server";
 import { serverGetTeamMembers } from "./users";
-// Helper function to convert date string to ISO DateTime
-export function toISODateTime(dateStr: string) {
-  const date = new Date(dateStr);
-  // Set to start of day in local timezone
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
+import { toISODateTime } from "./check-ins";
 
 // Define input schemas
 const getByDateSchema = z.object({
@@ -109,38 +103,6 @@ export const completionsRouter = router({
               message: "Team ID is required",
             });
           }
-          // const team = await ctx.prisma.team.findFirst({
-          //   where: {
-          //     id: teamId,
-          //   },
-          //   select: {
-          //     id: true,
-          //     name: true,
-          //     slug: true,
-          //     checkIns: true,
-          //     members: {
-          //       select: {
-          //         teamId: true,
-          //         userId: true,
-          //         role: true,
-          //         user: {
-          //           select: {
-          //             id: true,
-          //             name: true,
-          //             email: true,
-          //           },
-          //         },
-          //       },
-          //     },
-          //     bans: true,
-          //   },
-          // });
-          // if (!team) {
-          //   throw new TRPCError({
-          //     code: "NOT_FOUND",
-          //     message: "Team not found",
-          //   });
-          // }
 
           if (!ctx.userId) {
             throw new TRPCError({
@@ -290,11 +252,12 @@ export const completionsRouter = router({
           };
         } else {
           // Create the completion
+          const date = toISODateTime(input.date);
           const completion = await prisma.taskCompletion.create({
             data: {
               taskId: input.taskId,
               userId: ctx.userId,
-              completionDate: toISODateTime(input.date),
+              completionDate: date,
             },
           });
 
