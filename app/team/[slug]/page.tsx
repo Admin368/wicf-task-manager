@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TaskList } from "@/components/task-list";
 import { api } from "@/lib/trpc/client";
-import { Loader2, ExternalLink, Copy, Trash2 } from "lucide-react";
+import { Loader2, ExternalLink, Copy, Trash2, Ban } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
@@ -55,6 +55,13 @@ export default function TeamPage() {
       enabled: !!team?.id,
       onSuccess: (data) => {
         if (!data.hasAccess) {
+          if (data.reason === "banned") {
+            toast({
+              title: "Access Denied",
+              description: "You have been banned from this team.",
+              variant: "destructive",
+            });
+          }
           router.push(`/team/${slug}/join`);
         } else {
           setTeamLoaded(true);

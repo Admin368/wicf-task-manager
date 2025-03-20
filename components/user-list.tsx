@@ -18,6 +18,7 @@ import {
   Copy,
   Shield,
   ShieldOff,
+  Ban,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -40,6 +41,7 @@ interface TeamMember {
   role: string | null;
   notes?: string | null;
   checkedInAt?: string | null;
+  isBanned?: boolean;
 }
 
 interface UserListProps {
@@ -77,6 +79,40 @@ export function UserList({
     },
   });
 
+  const banUser = api.users.banUser.useMutation({
+    onSuccess: () => {
+      toast({
+        title: "User banned",
+        description: "The user has been banned from the team",
+      });
+      refetch?.();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to ban user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unbanUser = api.users.unbanUser.useMutation({
+    onSuccess: () => {
+      toast({
+        title: "User unbanned",
+        description: "The user has been unbanned from the team",
+      });
+      refetch?.();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to unban user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
     toast({
@@ -99,6 +135,32 @@ export function UserList({
       });
     } catch (error) {
       console.error("Failed to update role:", error);
+    }
+  };
+
+  const handleBanUser = async (memberId: string) => {
+    if (!teamId) return;
+
+    try {
+      await banUser.mutateAsync({
+        teamId,
+        userId: memberId,
+      });
+    } catch (error) {
+      console.error("Failed to ban user:", error);
+    }
+  };
+
+  const handleUnbanUser = async (memberId: string) => {
+    if (!teamId) return;
+
+    try {
+      await unbanUser.mutateAsync({
+        teamId,
+        userId: memberId,
+      });
+    } catch (error) {
+      console.error("Failed to unban user:", error);
     }
   };
 
@@ -194,6 +256,13 @@ export function UserList({
                     : "Member"}
                 </Badge>
 
+                {member.isBanned && (
+                  <Badge variant="destructive" className="flex items-center">
+                    <Ban className="h-3 w-3 mr-1" />
+                    Banned
+                  </Badge>
+                )}
+
                 {isAdmin && teamId && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -212,22 +281,41 @@ export function UserList({
                       </DropdownMenuItem>
 
                       {isAdmin && member.role !== "owner" && (
-                        member.role === "admin" ? (
-                          <DropdownMenuItem
-                            onClick={() => handleRoleChange(member.id, "member")}
-                            className="text-destructive"
-                          >
-                            <ShieldOff className="h-4 w-4 mr-2" />
-                            Remove Admin
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem
-                            onClick={() => handleRoleChange(member.id, "admin")}
-                          >
-                            <Shield className="h-4 w-4 mr-2" />
-                            Make Admin
-                          </DropdownMenuItem>
-                        )
+                        <>
+                          {member.role === "admin" ? (
+                            <DropdownMenuItem
+                              onClick={() => handleRoleChange(member.id, "member")}
+                              className="text-destructive"
+                            >
+                              <ShieldOff className="h-4 w-4 mr-2" />
+                              Remove Admin
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleRoleChange(member.id, "admin")}
+                            >
+                              <Shield className="h-4 w-4 mr-2" />
+                              Make Admin
+                            </DropdownMenuItem>
+                          )}
+                          {member.isBanned ? (
+                            <DropdownMenuItem
+                              onClick={() => handleUnbanUser(member.id)}
+                              className="text-green-600"
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Unban User
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleBanUser(member.id)}
+                              className="text-destructive"
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Ban User
+                            </DropdownMenuItem>
+                          )}
+                        </>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>

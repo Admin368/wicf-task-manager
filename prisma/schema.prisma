@@ -17,6 +17,7 @@ model Team {
   checkIns  CheckIn[]
   tasks     Task[]
   members   TeamMember[]
+  bans      TeamBan[]
 
   @@index([slug], map: "idx_teams_slug")
   @@map("teams")
@@ -35,6 +36,7 @@ model User {
   checkIns      CheckIn[]
   completions   TaskCompletion[]
   teamMembers   TeamMember[]
+  teamBans      TeamBan[]
 
   @@map("users")
 }
@@ -100,4 +102,18 @@ model TaskCompletion {
   @@index([taskId], map: "idx_completions_task_id")
   @@index([userId, completionDate], map: "idx_completions_user_date")
   @@map("task_completions")
+}
+
+model TeamBan {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  bannedAt  DateTime @default(now()) @map("banned_at") @db.Timestamptz(6)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([teamId, userId])
+  @@index([teamId], map: "idx_team_bans_team")
+  @@index([userId], map: "idx_team_bans_user")
+  @@map("team_bans")
 }

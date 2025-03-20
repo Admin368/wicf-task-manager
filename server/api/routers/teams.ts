@@ -166,7 +166,7 @@ export const teamsRouter = router({
         }
 
         // Create team and add creator as admin in a transaction
-        const team = await ctx.prisma.$transaction(async (tx) => {
+        const team = await ctx.prisma.$transaction(async (tx: typeof ctx.prisma) => {
           const newTeam = await tx.team.create({
             data: {
               name: input.name,
@@ -203,6 +203,20 @@ export const teamsRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         if (!ctx.userId) throw new Error("User ID is required");
+
+        // Check if user is banned from the team
+        const ban = await ctx.prisma.teamBan.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId,
+            },
+          },
+        });
+
+        if (ban) {
+          throw new Error("You have been banned from this team");
+        }
 
         // Check if user is already a member
         const existingMembership = await ctx.prisma.teamMember.findUnique({
@@ -255,6 +269,20 @@ export const teamsRouter = router({
       try {
         if (!ctx.userId) throw new Error("User ID is required");
         const userId = ctx.userId; // Create a non-nullable reference
+
+        // Check if user is banned from the team
+        const ban = await ctx.prisma.teamBan.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId,
+            },
+          },
+        });
+
+        if (ban) {
+          return { hasAccess: false, reason: "banned" };
+        }
 
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {

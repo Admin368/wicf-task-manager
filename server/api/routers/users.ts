@@ -43,7 +43,7 @@ export const usersRouter = router({
           });
         }
 
-        // Get all team members with user details
+        // Get all team members with user details and ban status
         const members = await ctx.prisma.teamMember.findMany({
           where: {
             teamId: input.teamId,
@@ -60,13 +60,26 @@ export const usersRouter = router({
           },
         });
 
-        // Transform the data to include role information
-        return members.map(member => ({
+        // Get ban status for all members
+        const bans = await ctx.prisma.teamBan.findMany({
+          where: {
+            teamId: input.teamId,
+          },
+          select: {
+            userId: true,
+          },
+        });
+
+        const bannedUserIds = new Set(bans.map(ban => ban.userId));
+
+        // Transform the data to include role information and ban status
+        return members.map((member: { user: { id: string; name: string; email: string; avatarUrl: string | null }; role: string | null }) => ({
           id: member.user.id,
           name: member.user.name,
           email: member.user.email,
           avatarUrl: member.user.avatarUrl,
           role: member.role,
+          isBanned: bannedUserIds.has(member.user.id),
         }));
       } catch (error) {
         if (error instanceof TRPCError) throw error;
@@ -180,4 +193,154 @@ export const usersRouter = router({
         throw error;
       }
     }),
+
+  banUser: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid(),
+        teamId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // First verify the current user is an admin
+        const currentUserRole = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId ?? "",
+            },
+          },
+          select: { role: true },
+        });
+
+        if (
+          !currentUserRole ||
+          !currentUserRole.role ||
+          !["admin", "owner"].includes(currentUserRole.role)
+        ) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to ban users",
+          });
+        }
+
+        // Check if user is already banned
+        const existingBan = await ctx.prisma.teamBan.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: input.userId,
+            },
+          },
+        });
+
+        if (existingBan) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "User is already banned from this team",
+          });
+        }
+
+        // Create a new team ban
+        await ctx.prisma.teamBan.create({
+          data: {
+            teamId: input.teamId,
+            userId: input.userId,
+          },
+        });
+
+        return { success: true };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error("Error banning user:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to ban user",
+        });
+      }
+    }),
+
+  unbanUser: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string().uuid(),
+        teamId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // First verify the current user is an admin
+        const currentUserRole = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId ?? "",
+            },
+          },
+          select: { role: true },
+        });
+
+        if (
+          !currentUserRole ||
+          !currentUserRole.role ||
+          !["admin", "owner"].includes(currentUserRole.role)
+        ) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to unban users",
+          });
+        }
+
+        // Remove the team ban
+        await ctx.prisma.teamBan.delete({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: input.userId,
+            },
+          },
+        });
+
+        return { success: true };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error("Error unbanning user:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to unban user",
+        });
+      }
+    }),
+
+  me: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      const user = await ctx.prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+          isBanned: true,
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
+      }
+
+      return user;
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      console.error("Error fetching current user:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch current user",
+      });
+    }
+  }),
 });
