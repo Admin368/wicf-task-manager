@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { DatePicker } from "@/components/date-picker";
-import { UserList } from "@/components/user-list";
+// import { UserList } from "@/components/user-list";
 import { toast } from "@/components/ui/use-toast";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
 import { cn } from "@/lib/utils";
+import { UserListCheckIns } from "@/components/user-list-checkins";
 
 interface HistoryItem {
   check_in_date: string;
@@ -93,7 +94,7 @@ export default function CheckInsPage() {
         teamId: team?.id || "",
         date: formattedDate,
       },
-      { 
+      {
         enabled: !!team?.id && teamLoaded,
         retry: false,
         onError: (error) => {
@@ -113,13 +114,14 @@ export default function CheckInsPage() {
         teamId: team?.id || "",
         limit: 30,
       },
-      { 
+      {
         enabled: !!team?.id && teamLoaded,
         retry: false,
         onError: (error) => {
           toast({
             title: "Error",
-            description: "Failed to get check-in history. Please refresh the page.",
+            description:
+              "Failed to get check-in history. Please refresh the page.",
             variant: "destructive",
           });
         },
@@ -188,16 +190,8 @@ export default function CheckInsPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : checkIns && checkIns.length > 0 ? (
-              <UserList
-                teamMembers={checkIns.map((c: CheckIn) => ({
-                  id: c.userId,
-                  name: c.user.name || "Unknown",
-                  email: c.user.email,
-                  avatar_url: c.user.avatar_url,
-                  role: "member",
-                  notes: c.notes,
-                  checkedInAt: c.checkedInAt,
-                }))}
+              <UserListCheckIns
+                checkIns={checkIns}
                 onClose={() => {}}
                 showTime
                 teamId={team.id}

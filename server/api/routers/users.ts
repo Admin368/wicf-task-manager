@@ -367,7 +367,7 @@ export const usersRouter = router({
           name: true,
           email: true,
           avatarUrl: true,
-          isBanned: true,
+          // isBanned: true,
         },
       });
 

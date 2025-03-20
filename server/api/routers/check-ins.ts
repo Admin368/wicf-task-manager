@@ -4,6 +4,76 @@ import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 
+export const serverGetCheckIns = async (args: {
+  teamId: string;
+  date: string;
+}) => {
+  const checkIns = await prisma.checkIn.findMany({
+    where: {
+      teamId: args.teamId,
+      checkInDate: toISODateTime(args.date),
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          bans: true,
+          members: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                },
+              },
+              role: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      checkedInAt: "asc",
+    },
+  });
+
+  return checkIns.map((checkIn: CheckInWithUser) => ({
+    id: checkIn.id,
+    userId: checkIn.userId,
+    checkInDate: checkIn.checkInDate,
+    checkedInAt: checkIn.checkedInAt,
+    notes: checkIn.notes,
+    rating: checkIn.rating,
+    checkoutAt: checkIn.checkoutAt,
+    user: checkIn.user,
+    role: (checkIn as any).team.members.find(
+      (member: { user: { id: string }; role: string }) =>
+        member.user.id === checkIn.userId
+    )?.role,
+    isBanned: (checkIn as any).team.bans.some(
+      (ban: { userId: string }) => ban.userId === checkIn.userId
+    ),
+    memberId: (checkIn as any).team.members.find(
+      (member: { user: { id: string } }) => member.user.id === checkIn.userId
+    )?.id,
+  }));
+};
+
+export type serverGetCheckInsReturnType = Awaited<
+  ReturnType<typeof serverGetCheckIns>
+>[number];
+
 // Helper function to convert date string to ISO DateTime
 function toISODateTime(dateStr: string) {
   const date = new Date(dateStr);
@@ -124,36 +194,11 @@ export const checkInsRouter = router({
         }
 
         // Get check-ins with user details
-        const checkIns = await prisma.checkIn.findMany({
-          where: {
-            teamId: input.teamId,
-            checkInDate: toISODateTime(input.date),
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                avatarUrl: true,
-              },
-            },
-          },
-          orderBy: {
-            checkedInAt: "asc",
-          },
-        });
 
-        return checkIns.map((checkIn: CheckInWithUser) => ({
-          id: checkIn.id,
-          userId: checkIn.userId,
-          checkInDate: checkIn.checkInDate,
-          checkedInAt: checkIn.checkedInAt,
-          notes: checkIn.notes,
-          rating: checkIn.rating,
-          checkoutAt: checkIn.checkoutAt,
-          user: checkIn.user,
-        }));
+        return await serverGetCheckIns({
+          teamId: input.teamId,
+          date: input.date,
+        });
       } catch (error) {
         console.error("Error fetching check-ins:", error);
         if (error instanceof TRPCError) throw error;
