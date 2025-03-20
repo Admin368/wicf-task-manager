@@ -3,8 +3,78 @@ import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
-import { getTeamMembers } from "./users";
+import { serverGetTeamMembers } from "./users";
 import { toISODateTime } from "./completions";
+import { serverGetCheckInStatus } from "./check-ins";
+import { prisma } from "@/lib/prisma";
+
+export const serverGetTasks = async (args: {
+  teamId: string;
+  date: string;
+}) => {
+  return await prisma.task.findMany({
+    where: {
+      teamId: args.teamId,
+      isDeleted: false,
+    },
+    include: {
+      assignments: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+    orderBy: {
+      position: "asc",
+    },
+  });
+};
+
+export type serverGetTasksReturnType = Awaited<
+  ReturnType<typeof serverGetTasks>
+>[number];
+
+export const serverGetCompletions = async (args: {
+  teamId: string;
+  date: string;
+  userId: string;
+}) => {
+  return await prisma.taskCompletion.findMany({
+    where: {
+      completionDate: toISODateTime(args.date),
+      task: {
+        team: {
+          members: {
+            some: {
+              userId: args.userId,
+            },
+          },
+        },
+        isDeleted: false,
+      },
+    },
+    include: {
+      task: {
+        include: {
+          team: {
+            include: {
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      user: true,
+    },
+  });
+};
+
+export type serverGetCompletionsReturnType = Awaited<
+  ReturnType<typeof serverGetCompletions>
+>[number];
 
 export const tasksRouter = router({
   getByTeam: protectedProcedure
@@ -34,57 +104,20 @@ export const tasksRouter = router({
         }
 
         // Get tasks with assignments
-        const tasks = await ctx.prisma.task.findMany({
-          where: {
-            teamId: input.teamId,
-            isDeleted: false,
-          },
-          include: {
-            assignments: {
-              select: {
-                userId: true,
-              },
-            },
-          },
-          orderBy: {
-            position: "asc",
-          },
+        const tasks = await serverGetTasks({
+          teamId: input.teamId,
+          date: input.date,
         });
-        const teamMembers = await getTeamMembers({
+        const teamMembers = await serverGetTeamMembers({
           ctx,
           teamId: input.teamId,
           userId: ctx.userId!,
         });
-        const completions = await ctx.prisma.taskCompletion.findMany({
-          where: {
-            completionDate: toISODateTime(input.date),
-            task: {
-              team: {
-                members: {
-                  some: {
-                    userId: ctx.userId,
-                  },
-                },
-              },
-              isDeleted: false,
-            },
-          },
-          include: {
-            task: {
-              include: {
-                team: {
-                  include: {
-                    members: {
-                      include: {
-                        user: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            user: true,
-          },
+
+        const completions = await serverGetCompletions({
+          teamId: input.teamId,
+          date: input.date,
+          userId: ctx.userId!,
         });
 
         const checkInStatus = await serverGetCheckInStatus({
@@ -418,12 +451,19 @@ export const tasksRouter = router({
           message: "Task not found",
         });
       }
+      const teamId = task.teamId;
+      if (!teamId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found",
+        });
+      }
 
       // Verify user is a member of the team
       const teamMember = await ctx.prisma.teamMember.findUnique({
         where: {
           teamId_userId: {
-            teamId: task.teamId,
+            teamId,
             userId: ctx.userId,
           },
         },
@@ -473,10 +513,3 @@ export const tasksRouter = router({
       return { success: true };
     }),
 });
-function serverGetCheckInStatus(arg0: {
-  ctx: { prisma: any; headers: Headers; userId: string };
-  teamId: string;
-  date: string;
-}) {
-  throw new Error("Function not implemented.");
-}

@@ -52,9 +52,9 @@ export function TaskList({
   // Fetch tasks and completions for the specific team
   const {
     data,
-    isLoading: isLoadingTasks,
+    isLoading,
     error: tasksError,
-    refetch: refetchTasks,
+    refetch,
   } = api.tasks.getByTeam.useQuery(
     { teamId, date: formattedDate },
     {
@@ -136,7 +136,7 @@ export function TaskList({
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetchTasks?.();
+      refetch?.();
       setShowTaskDialog(false);
     } catch (error) {
       console.error("Failed to create task:", error);
@@ -162,7 +162,7 @@ export function TaskList({
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetchTasks?.();
+      refetch?.();
       setEditingTask(null);
       setShowTaskDialog(false);
     } catch (error) {
@@ -184,7 +184,7 @@ export function TaskList({
       setError(null);
       await deleteTask.mutateAsync({ id: taskId });
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetchTasks?.();
+      refetch?.();
     } catch (error) {
       console.error("Failed to delete task:", error);
     }
@@ -238,13 +238,16 @@ export function TaskList({
 
       // Update task positions in batch
       await updateTask.mutateAsync({
-        updates,
+        updates: updates.map((update) => ({
+          ...update,
+          position: update.position || 0,
+        })),
         teamId,
       });
 
       // Invalidate tasks query to refresh the list
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetchTasks?.();
+      refetch?.();
     } catch (error) {
       console.error("Error moving task:", error);
       setError("Failed to move task. Please try again.");
@@ -310,7 +313,7 @@ export function TaskList({
     );
   }
 
-  if (isLoadingTasks || isLoadingCompletions) {
+  if (isLoading) {
     return (
       <div className="space-y-2">
         <Skeleton className="h-12 w-full" />
@@ -374,7 +377,7 @@ export function TaskList({
             teamId={teamId}
             teamMembers={teamMembers}
             onClose={() => setShowUserList(false)}
-            refetch={refetchCompletions}
+            refetch={refetch}
           />
         )}
 
@@ -389,11 +392,11 @@ export function TaskList({
               variant="outline"
               size="sm"
               onClick={() => {
-                refetchCompletions?.();
+                refetch?.();
               }}
-              disabled={isLoadingCompletions}
+              disabled={isLoading}
             >
-              {isLoadingCompletions ? "Refreshing..." : "Refresh"}
+              {isLoading ? "Refreshing..." : "Refresh"}
             </Button>
             <Button
               variant="outline"
@@ -414,10 +417,12 @@ export function TaskList({
             </Button>
           </div>
           <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground">
-            {"You must be checked in to complete tasks"}
+            {checkInStatus?.checkedIn
+              ? "You must be checked in to complete tasks"
+              : "You are not checked in"}
           </div>
           <div className="">
-            {isLoadingTasks || isLoadingCompletions ? (
+            {isLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-2 p-2">
@@ -426,7 +431,7 @@ export function TaskList({
                   </div>
                 ))}
               </div>
-            ) : tasksError || completionsError ? (
+            ) : tasksError ? (
               <div className="text-center py-8 text-destructive">
                 <p>Failed to load tasks. Please try refreshing the page.</p>
               </div>
@@ -440,17 +445,17 @@ export function TaskList({
                   <div className="mb-4 text-sm text-red-500">{error}</div>
                 )}
 
-                {isLoadingTasks || isLoadingCompletions ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : (
                   <div>
-                    {topLevelTasks.map((task: Task) => (
+                    {topLevelTasks.map((task) => (
                       <TaskItem
                         key={task.id}
                         task={task}
-                        tasks={tasks}
+                        tasks={tasks || []}
                         completions={completions || []}
                         teamMembers={teamMembers || []}
                         selectedDate={selectedDate.toISOString().split("T")[0]}
@@ -458,11 +463,11 @@ export function TaskList({
                         onEditTask={onEditTask}
                         onDeleteTask={handleDeleteTask}
                         onMoveTask={handleMoveTask}
-                        refetchCompletions={refetchCompletions}
-                        refetchMembers={refetchCompletions}
+                        refetch={refetch}
                         isAdmin={isAdmin}
                         hideTools={hideTools}
                         hideNotAssignedToMe={showAssignedToMe}
+                        isCheckedIn={checkInStatus?.checkedIn ?? false}
                       />
                     ))}
                   </div>

@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { hashPassword } from "@/lib/auth";
 
-export const getTeamMembers = async ({
+export const serverGetTeamMembers = async ({
   ctx,
   teamId,
   userId,
@@ -80,6 +80,10 @@ export const getTeamMembers = async ({
   );
 };
 
+export type serverGetTeamMembersReturnType = Awaited<
+  ReturnType<typeof serverGetTeamMembers>
+>[number];
+
 export const usersRouter = router({
   getAll: publicProcedure.query(async ({ ctx }) => {
     try {
@@ -117,7 +121,7 @@ export const usersRouter = router({
             message: "You don't have access to this team",
           });
         }
-        return await getTeamMembers({
+        return await serverGetTeamMembers({
           ctx,
           teamId: input.teamId,
           userId: ctx.userId,

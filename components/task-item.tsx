@@ -29,23 +29,23 @@ import { TaskCompletionModal } from "./task-completion-modal";
 import { format } from "date-fns";
 import { toast as sonnerToast } from "sonner";
 import { TaskAssignmentDialog } from "./task-assignment-dialog";
+// import { TaskCompletion } from "@prisma/client";
+import { serverGetTeamMembersReturnType } from "@/server/api/routers/users";
+import {
+  serverGetCompletionsReturnType,
+  serverGetTasksReturnType,
+} from "@/server/api/routers/tasks";
+// import { Task } from "@prisma/client";
 
 interface TaskItemProps {
-  task: {
-    id: string;
-    title: string;
-    parentId: string | null;
-    position: number;
-    teamId: string;
-    assignments?: { userId: string }[];
-  };
-  tasks: any[];
-  completions: any[];
-  teamMembers: any[];
+  task: serverGetTasksReturnType;
+  tasks: serverGetTasksReturnType[];
+  completions: serverGetCompletionsReturnType[];
+  teamMembers: serverGetTeamMembersReturnType[];
   selectedDate: string;
   level?: number;
   onAddSubtask?: (parentId: string) => void;
-  onEditTask?: (task: any) => void;
+  onEditTask?: (task: serverGetTasksReturnType) => void;
   onDeleteTask?: (taskId: string) => void;
   onMoveTask?: (taskId: string, direction: "up" | "down") => void;
   className?: string;
@@ -152,7 +152,7 @@ export function TaskItem({
 
   const completeTask = async (checked: boolean) => {
     try {
-      if (!checkInStatus?.checkedIn) {
+      if (!isCheckedIn) {
         console.log("Not checked in");
         toast({
           title: "Error",
@@ -227,7 +227,7 @@ export function TaskItem({
       .filter(Boolean) || [];
 
   const isThisTaskAssignedToMe = assignedUsers.some(
-    (user) => user.id === userId
+    (user) => user?.id === userId
   );
   if (!isThisTaskAssignedToMe && hideNotAssignedToMe) {
     return null;
@@ -284,14 +284,16 @@ export function TaskItem({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <TaskAssignmentDialog
-                              taskId={task.id}
-                              teamId={task.teamId}
-                              currentAssigneeId={assignedUsers[0]?.id}
-                              teamMembers={teamMembers}
-                              taskAssignments={task.assignments}
-                              refetchMembers={refetchMembers}
-                            />
+                            {task.teamId && (
+                              <TaskAssignmentDialog
+                                taskId={task.id}
+                                teamId={task.teamId}
+                                currentAssigneeId={assignedUsers[0]?.id}
+                                teamMembers={teamMembers}
+                                taskAssignments={task.assignments}
+                                refetchMembers={refetchMembers}
+                              />
+                            )}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditTask?.(task)}>
                             <Pencil className="h-4 w-4 mr-2" />
@@ -334,14 +336,16 @@ export function TaskItem({
                     </>
                   ) : (
                     <>
-                      <TaskAssignmentDialog
-                        taskId={task.id}
-                        teamId={task.teamId}
-                        currentAssigneeId={assignedUsers[0]?.id}
-                        teamMembers={teamMembers}
-                        taskAssignments={task.assignments}
-                        refetchMembers={refetchMembers}
-                      />
+                      {task.teamId && (
+                        <TaskAssignmentDialog
+                          taskId={task.id}
+                          teamId={task.teamId}
+                          currentAssigneeId={assignedUsers[0]?.id}
+                          teamMembers={teamMembers}
+                          taskAssignments={task.assignments}
+                          refetchMembers={refetchMembers}
+                        />
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -396,12 +400,23 @@ export function TaskItem({
                 Assigned to:{" "}
                 {assignedUsers.map((user) => (
                   <div
-                    key={user.id}
+                    key={user?.id}
                     className="flex gap-1 text-xs text-muted-foreground"
                   >
-                    <span className="font-medium">{user.name},</span>
+                    <span className="font-medium">{user?.name},</span>
                   </div>
                 ))}
+              </div>
+            )}
+            {completedBy && (
+              <div className="flex gap-1 text-xs text-muted-foreground pl-7">
+                Completed by:{" "}
+                <span className="font-medium">
+                  {
+                    teamMembers.find((member) => member.id === completedBy)
+                      ?.name
+                  }
+                </span>
               </div>
             )}
           </div>
@@ -425,6 +440,7 @@ export function TaskItem({
               refetchCompletions={refetchCompletions}
               isAdmin={isAdmin}
               hideTools={hideTools}
+              isCheckedIn={isCheckedIn}
             />
           ))}
         </div>

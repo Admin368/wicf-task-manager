@@ -55,7 +55,7 @@ interface CheckInWithUser {
   };
 }
 
-async function serverGetCheckInStatus({
+export async function serverGetCheckInStatus({
   ctx,
   teamId,
   date,
