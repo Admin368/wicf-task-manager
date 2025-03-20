@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { hash } from "bcryptjs";
 import { db } from "@/lib/db";
 import { EmailService } from "@/lib/email";
 import { env } from "@/lib/env";
+import { hashPassword } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return new NextResponse("User already exists", { status: 400 });
     }
 
-    const hashedPassword = await hash(password, 10);
+    const hashedPassword = await hashPassword(password);
 
     const user = await db.user.create({
       data: {

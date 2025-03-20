@@ -7,6 +7,7 @@ import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import type { Context } from "@/lib/trpc/server";
 import { TRPCError } from "@trpc/server";
 import { serverGetTeamMembers } from "./users";
+import { hashPassword, verifyPassword } from "@/lib/auth";
 
 type TeamInput = {
   name: string;
@@ -172,13 +173,16 @@ export const teamsRouter = router({
           slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
         }
 
+        // Hash the password
+        const hashedPassword = await hashPassword(input.password);
+
         // Create team and add creator as admin in a transaction
         const team = await ctx.prisma.$transaction(async (prisma) => {
           const newTeam = await prisma.team.create({
             data: {
               name: input.name,
               slug,
-              password: input.password, // In a real app, you'd hash this
+              password: hashedPassword,
             },
           });
 
@@ -246,7 +250,16 @@ export const teamsRouter = router({
           select: { password: true },
         });
 
-        if (!team || team.password !== input.password) {
+        if (!team) {
+          throw new Error("Team not found");
+        }
+
+        // Check if the password matches
+        const isPasswordValid = await verifyPassword(
+          team.password,
+          input.password
+        );
+        if (!isPasswordValid) {
           throw new Error("Incorrect password");
         }
 

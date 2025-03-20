@@ -129,7 +129,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       <Button
         variant="outline"
         type="button"
-        disabled={isLoading}
+        disabled={true}
         className="w-full"
       >
         {isLoading ? (
