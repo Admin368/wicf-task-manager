@@ -24,6 +24,9 @@ import {
 import CheckInsPage from "./check-ins/page";
 import { UserList } from "@/components/user-list";
 import { useSession } from "next-auth/react";
+import { CheckoutDialog } from "@/components/checkout-dialog";
+import { format } from "date-fns";
+
 export default function TeamPage() {
   const params = useParams();
   const router = useRouter();
@@ -33,10 +36,12 @@ export default function TeamPage() {
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [showUserList, setShowUserList] = useState(false);
+  const today = format(new Date(), "yyyy-MM-dd");
 
-  const { data: team, isLoading } = api.teams.getBySlug.useQuery(
+  const { data: teamData, isLoading } = api.teams.getBySlug.useQuery(
     { slug },
     {
+      enabled: !teamLoaded,
       onError: (error) => {
         toast({
           title: "Error",
@@ -47,7 +52,8 @@ export default function TeamPage() {
       },
     }
   );
-
+  // const teamMembers = team?.members;
+  const { team, teamMembers } = teamData || {};
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
@@ -74,11 +80,33 @@ export default function TeamPage() {
   );
 
   // Get team members count for check-in status
-  const { data: teamMembers } = api.users.getTeamMembers.useQuery(
-    { teamId: team?.id || "" },
-    { enabled: !!team?.id && teamLoaded }
+  // const { data: teamMembers } = api.users.getTeamMembers.useQuery(
+  //   { teamId: team?.id || "" },
+  //   { enabled: !!team?.id && teamLoaded }
+  // );
+  const {
+    data: checkIns,
+    isLoading: checkInsIsLoading,
+    refetch: refreshCheckIns,
+  } = api.checkIns.getByTeamAndDate.useQuery(
+    {
+      teamId: team?.id || "",
+      date: today,
+    },
+    {
+      enabled: !!team?.id,
+      // retry: false,
+      refetchInterval: 1000 * 60 * 1, // ms * sec * min
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: "Failed to get check-ins. Please refresh the page.",
+          variant: "destructive",
+        });
+      },
+    }
   );
-
+  const isCheckedIn = checkIns?.some((checkIn) => checkIn.userId === userId);
   // Get current user's role
   const currentUserRole = teamMembers?.find(
     (member: any) => member.id === userId
@@ -122,8 +150,18 @@ export default function TeamPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sidebar for check-ins */}
         <div className="space-y-6">
-          <CheckInButton teamId={team.id} />
-          <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} />
+          <CheckInButton
+            teamId={team.id}
+            checkIns={checkIns || []}
+            refetch={refreshCheckIns}
+            isCheckedIn={isCheckedIn || false}
+          />
+          <CheckInStatusBar
+            teamId={team.id}
+            totalMembers={totalMembers}
+            checkIns={checkIns || []}
+            isLoading={checkInsIsLoading}
+          />
 
           <Button
             variant="outline"
@@ -151,6 +189,11 @@ export default function TeamPage() {
             <ExternalLink className="h-4 w-4 mr-2" />
             View Full Check-in History
           </Button>
+          <CheckoutDialog
+            isDisabled={!isCheckedIn}
+            teamId={team.id}
+            userId={userId}
+          />
 
           {isAdmin && (
             <AlertDialog>
@@ -202,7 +245,7 @@ export default function TeamPage() {
             </TabsContent>
           </Tabs>
 
-          {showUserList && team.id && (
+          {showUserList && team.id && teamMembers && (
             <UserList
               teamMembers={teamMembers || []}
               onClose={() => setShowUserList(false)}

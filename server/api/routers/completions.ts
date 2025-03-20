@@ -4,8 +4,7 @@ import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
 import type { Context } from "@/lib/trpc/server";
-import { getTeamMembers } from "./users";
-
+import { serverGetTeamMembers } from "./users";
 // Helper function to convert date string to ISO DateTime
 export function toISODateTime(dateStr: string) {
   const date = new Date(dateStr);
@@ -150,7 +149,7 @@ export const completionsRouter = router({
             });
           }
 
-          const teamMembers = await getTeamMembers({
+          const teamMembers = await serverGetTeamMembers({
             ctx,
             teamId,
             userId: ctx.userId,

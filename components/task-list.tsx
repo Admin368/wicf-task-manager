@@ -39,7 +39,7 @@ export function TaskList({
   const [error, setError] = useState<string | null>(null);
   const [hideTools, setHideTools] = useState(true);
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
-  const today = format(new Date(), "yyyy-MM-dd");
+  // const today = format(new Date(), "yyyy-MM-dd");
 
   const formattedDate = selectedDate.toISOString().split("T")[0];
 

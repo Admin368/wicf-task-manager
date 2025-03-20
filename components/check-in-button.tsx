@@ -15,12 +15,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/trpc/client";
-
+import { serverGetCheckInsReturnType } from "@/server/api/routers/check-ins";
 interface CheckInButtonProps {
   teamId: string;
+  checkIns: serverGetCheckInsReturnType[];
+  refetch: () => void;
+  isCheckedIn: boolean;
 }
 
-export function CheckInButton({ teamId }: CheckInButtonProps) {
+export function CheckInButton({
+  teamId,
+  checkIns,
+  refetch,
+  isCheckedIn,
+}: CheckInButtonProps) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const router = useRouter();
@@ -28,27 +36,27 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
   const today = format(new Date(), "yyyy-MM-dd");
 
   // Get the user's check-in status for today
-  const {
-    data: checkInStatus,
-    isLoading: checkingStatus,
-    refetch: refetchStatus,
-  } = api.checkIns.getUserCheckInStatus.useQuery(
-    {
-      teamId,
-      date: today,
-    },
-    {
-      enabled: !!teamId, // Only run query when teamId exists
-      retry: false, // Don't retry on error
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to get check-in status. Please refresh the page.",
-          variant: "destructive",
-        });
-      },
-    }
-  );
+  // const {
+  //   data: checkInStatus,
+  //   isLoading: checkingStatus,
+  //   refetch: refetchStatus,
+  // } = api.checkIns.getUserCheckInStatus.useQuery(
+  //   {
+  //     teamId,
+  //     date: today,
+  //   },
+  //   {
+  //     enabled: !!teamId, // Only run query when teamId exists
+  //     retry: false, // Don't retry on error
+  //     onError: (error) => {
+  //       toast({
+  //         title: "Error",
+  //         description: "Failed to get check-in status. Please refresh the page.",
+  //         variant: "destructive",
+  //       });
+  //     },
+  //   }
+  // );
 
   // Mutation for checking in
   const { mutate: checkIn, isLoading: isCheckingIn } =
@@ -67,7 +75,7 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
         }
         setOpen(false);
         setNotes("");
-        refetchStatus();
+        refetch();
         router.refresh();
       },
       onError: (error) => {
@@ -87,8 +95,8 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
     });
   };
 
-  const isLoading = checkingStatus || isCheckingIn;
-  const hasCheckedIn = checkInStatus?.checkedIn;
+  const isLoading = isCheckingIn;
+  // const hasCheckedIn = checkIns?.some((checkIn) => checkIn.userId === userId);
 
   return (
     <>
@@ -97,12 +105,12 @@ export function CheckInButton({ teamId }: CheckInButtonProps) {
         size="lg"
         id="check-in-button"
         onClick={() => setOpen(true)}
-        disabled={isLoading || hasCheckedIn}
-        variant={hasCheckedIn ? "outline" : "default"}
+        disabled={isLoading || isCheckedIn}
+        variant={isCheckedIn ? "outline" : "default"}
       >
         {isLoading ? (
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        ) : hasCheckedIn ? (
+        ) : isCheckedIn ? (
           <>
             <CheckCircle2 className="mr-2 h-5 w-5 text-green-500" />
             <span>Already Checked In Today</span>

@@ -34,22 +34,23 @@ import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/trpc/client";
 import { useSession } from "next-auth/react";
 import { StarRating } from "@/components/ui/star-rating";
+import { serverGetTeamMembersReturnType } from "@/server/api/routers/users";
 
-interface TeamMember {
-  id: string;
-  name: string;
-  email: string | null;
-  avatarUrl: string | null;
-  role: string | null;
-  notes?: string | null;
-  checkedInAt?: string | null;
-  isBanned?: boolean;
-  rating?: number | null;
-  checkoutAt?: string | null;
-}
+// interface TeamMember {
+//   id: string;
+//   name: string;
+//   email: string | null;
+//   avatarUrl: string | null;
+//   role: string | null;
+//   notes?: string | null;
+//   checkedInAt?: string | null;
+//   isBanned?: boolean;
+//   rating?: number | null;
+//   checkoutAt?: string | null;
+// }
 
 interface UserListProps {
-  teamMembers: TeamMember[];
+  teamMembers: serverGetTeamMembersReturnType[];
   onClose: () => void;
   showTime?: boolean;
   teamId: string;
@@ -65,7 +66,8 @@ export function UserList({
 }: UserListProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const isAdmin = teamMembers.find((member) => member.id === userId)?.role === "admin";
+  const isAdmin =
+    teamMembers.find((member) => member.id === userId)?.role === "admin";
   const updateRole = api.teams.updateMemberRole.useMutation({
     onSuccess: () => {
       toast({
@@ -198,9 +200,7 @@ export function UserList({
           <CardTitle>
             {showTime ? "Checked-in Members" : "Team Members"}
           </CardTitle>
-          <CardDescription>
-            {isAdmin ? "Admin" : "Member"}
-          </CardDescription>
+          <CardDescription>{isAdmin ? "Admin" : "Member"}</CardDescription>
           <CardDescription>
             {teamMembers.length}{" "}
             {teamMembers.length === 1 ? "member" : "members"}{" "}
@@ -247,35 +247,9 @@ export function UserList({
                     {member.email}
                   </div>
                 )}
-                {showTime && member.checkedInAt && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Checked in at {format(new Date(member.checkedInAt), "h:mm a")}
-                  </div>
-                )}
-                {member.checkoutAt && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <LogOut className="h-3 w-3" />
-                    Checked out at {format(new Date(member.checkoutAt), "h:mm a")}
-                  </div>
-                )}
-                {member.rating && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <StarRating rating={member.rating} />
-                  </div>
-                )}
-                {member.notes && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {member.notes}
-                  </div>
-                )}
               </div>
               <div className="flex items-center gap-2">
-                {member.isBanned && (
-                  <Badge variant="destructive">
-                    Banned
-                  </Badge>
-                )}
+                {member.isBanned && <Badge variant="destructive">Banned</Badge>}
                 <Badge
                   variant="secondary"
                   className={`flex items-center ${getRoleColor(member.role)}`}

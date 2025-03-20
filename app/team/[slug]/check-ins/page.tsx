@@ -49,19 +49,21 @@ export default function CheckInsPage() {
 
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
 
-  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery(
-    { slug },
-    {
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Team not found or you don't have access.",
-          variant: "destructive",
-        });
-        router.push("/");
-      },
-    }
-  );
+  const { data: teamData, isLoading: teamLoading } =
+    api.teams.getBySlug.useQuery(
+      { slug },
+      {
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "Team not found or you don't have access.",
+            variant: "destructive",
+          });
+          router.push("/");
+        },
+      }
+    );
+  const { team, teamMembers } = teamData || {};
 
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
@@ -82,10 +84,10 @@ export default function CheckInsPage() {
   );
 
   // Get team members
-  const { data: teamMembers } = api.users.getTeamMembers.useQuery(
-    { teamId: team?.id || "" },
-    { enabled: !!team?.id && teamLoaded }
-  );
+  // const { data: teamMembers } = api.users.getTeamMembers.useQuery(
+  //   { teamId: team?.id || "" },
+  //   { enabled: !!team?.id && teamLoaded }
+  // );
 
   // Get check-ins for the selected date
   const { data: checkIns, isLoading: checkInsLoading } =

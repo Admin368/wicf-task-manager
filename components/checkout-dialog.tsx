@@ -17,15 +17,20 @@ import { StarRating } from "./star-rating";
 
 interface CheckoutDialogProps {
   teamId: string;
-  checkInId: string;
+  userId?: string;
+  isDisabled?: boolean;
 }
 
-export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
+export function CheckoutDialog({
+  teamId,
+  userId,
+  isDisabled = false,
+}: CheckoutDialogProps) {
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState("");
 
-  const utils = api.useContext();
+  // const utils = api.useContext();
 
   const checkout = api.checkIns.checkout.useMutation({
     onSuccess: () => {
@@ -34,7 +39,7 @@ export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
         description: "Your daily checkout has been recorded",
       });
       setOpen(false);
-      utils.checkIns.getByTeam.invalidate({ teamId });
+      // utils.checkIns.getByTeam.invalidate({ teamId });
     },
     onError: (error) => {
       toast({
@@ -57,7 +62,7 @@ export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
 
     try {
       await checkout.mutateAsync({
-        checkInId,
+        checkInId: userId || "",
         rating,
         notes,
       });
@@ -69,9 +74,14 @@ export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <LogOut className="h-4 w-4 mr-2" />
-          Checkout
+        <Button
+          className="w-full h-16 text-lg font-semibold"
+          size="lg"
+          variant="default"
+          disabled={isDisabled}
+        >
+          <LogOut className="h-4 w-4 mr-2 text-green-500" />
+          Done for the Day (Checkout)
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -97,6 +107,9 @@ export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
               Cancel
             </Button>
             <Button
+              className="w-full h-16 text-lg font-semibold"
+              size="lg"
+              id="check-in-button"
               onClick={handleCheckout}
               disabled={checkout.isLoading}
             >
@@ -110,4 +123,4 @@ export function CheckoutDialog({ teamId, checkInId }: CheckoutDialogProps) {
       </DialogContent>
     </Dialog>
   );
-} 
+}

@@ -40,20 +40,21 @@ export default function CheckInHistoryPage() {
   const [teamLoaded, setTeamLoaded] = useState(false);
 
   // Get team data
-  const { data: team, isLoading: teamLoading } = api.teams.getBySlug.useQuery(
-    { slug },
-    {
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Team not found or you don't have access.",
-          variant: "destructive",
-        });
-        router.push("/");
-      },
-    }
-  );
-
+  const { data: teamData, isLoading: teamLoading } =
+    api.teams.getBySlug.useQuery(
+      { slug },
+      {
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "Team not found or you don't have access.",
+            variant: "destructive",
+          });
+          router.push("/");
+        },
+      }
+    );
+  const { team, teamMembers } = teamData || {};
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
@@ -73,10 +74,10 @@ export default function CheckInHistoryPage() {
   );
 
   // Get team members count
-  const { data: teamMembers } = api.users.getTeamMembers.useQuery(
-    { teamId: team?.id || "" },
-    { enabled: !!team?.id && teamLoaded }
-  );
+  // const { data: teamMembers } = api.users.getTeamMembers.useQuery(
+  //   { teamId: team?.id || "" },
+  //   { enabled: !!team?.id && teamLoaded }
+  // );
 
   // Get check-in history
   const { data: history, isLoading: historyLoading } =
@@ -86,7 +87,7 @@ export default function CheckInHistoryPage() {
         limit: historyDays,
       },
       { enabled: !!team?.id && teamLoaded }
-    );
+    ) as { data: HistoryItem[] | undefined; isLoading: boolean };
 
   const totalMembers = teamMembers?.length || 0;
 

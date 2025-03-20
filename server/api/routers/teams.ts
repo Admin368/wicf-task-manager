@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import type { Context } from "@/lib/trpc/server";
 import { TRPCError } from "@trpc/server";
+import { serverGetTeamMembers } from "./users";
 
 type TeamInput = {
   name: string;
@@ -113,7 +114,7 @@ export const teamsRouter = router({
     }
   }),
 
-  getBySlug: publicProcedure
+  getBySlug: protectedProcedure
     .input(
       z.object({
         slug: z.string(),
@@ -133,7 +134,13 @@ export const teamsRouter = router({
             message: "Team not found",
           });
         }
-        return team;
+        const teamMembers = await serverGetTeamMembers({
+          ctx,
+          teamId: team.id,
+          userId: ctx.userId,
+          checkIfMember: true,
+        });
+        return { team, teamMembers };
       } catch (error) {
         console.error("Error fetching team:", error);
         throw error;
@@ -166,8 +173,8 @@ export const teamsRouter = router({
         }
 
         // Create team and add creator as admin in a transaction
-        const team = await ctx.prisma.$transaction(async (tx: typeof ctx.prisma) => {
-          const newTeam = await tx.team.create({
+        const team = await ctx.prisma.$transaction(async (prisma) => {
+          const newTeam = await prisma.team.create({
             data: {
               name: input.name,
               slug,
@@ -175,7 +182,7 @@ export const teamsRouter = router({
             },
           });
 
-          await tx.teamMember.create({
+          await prisma.teamMember.create({
             data: {
               teamId: newTeam.id,
               userId,
@@ -323,7 +330,7 @@ export const teamsRouter = router({
 
         if (
           !currentUserRole ||
-          !["admin", "owner"].includes(currentUserRole.role)
+          !["admin", "owner"].includes(currentUserRole.role ?? "")
         ) {
           throw new Error("You don't have permission to delete this team");
         }

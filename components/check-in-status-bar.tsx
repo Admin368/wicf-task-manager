@@ -24,67 +24,37 @@ import { CheckoutDialog } from "./checkout-dialog";
 import { StarRating } from "./star-rating";
 import { useSession } from "next-auth/react";
 import { UserListCheckIns } from "./user-list-checkins";
+import { serverGetCheckInsReturnType } from "@/server/api/routers/check-ins";
 interface CheckInStatusBarProps {
   teamId: string;
   totalMembers: number;
-}
-
-interface CheckIn {
-  id: string;
-  userId: string;
-  checkInDate: string;
-  checkedInAt: string;
-  notes: string | null;
-  rating: number | null;
-  checkoutAt: string | null;
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    avatar_url: string | null;
-  };
+  checkIns: serverGetCheckInsReturnType[];
+  isLoading: boolean;
 }
 
 export function CheckInStatusBar({
   teamId,
   totalMembers,
+  checkIns,
+  isLoading,
 }: CheckInStatusBarProps) {
   const { data: session } = useSession();
   const [showCheckedInUsers, setShowCheckedInUsers] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
 
-  const { data: checkIns, isLoading } = api.checkIns.getByTeamAndDate.useQuery(
-    {
-      teamId,
-      date: today,
-    },
-    {
-      enabled: !!teamId,
-      // retry: false,
-      refetchInterval: 1000 * 60 * 1, // ms * sec * min
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to get check-ins. Please refresh the page.",
-          variant: "destructive",
-        });
-      },
-    }
-  );
-
   const checkedInCount = checkIns?.length || 0;
-  const checkedOutCount = checkIns?.filter((c) => c.checkoutAt)?.length || 0;
+  // const checkedOutCount = checkIns?.filter((c) => c.checkoutAt)?.length || 0;
   const percentage =
     totalMembers > 0 ? Math.round((checkedInCount / totalMembers) * 100) : 0;
-  const checkoutPercentage =
-    checkedInCount > 0
-      ? Math.round((checkedOutCount / checkedInCount) * 100)
-      : 0;
+  // const checkoutPercentage =
+  //   checkedInCount > 0
+  //     ? Math.round((checkedOutCount / checkedInCount) * 100)
+  //     : 0;
 
-  // Get current user's check-in
-  const currentUserCheckIn = checkIns?.find(
-    (c) => c.userId === session?.user?.id
-  );
+  // // Get current user's check-in
+  // const currentUserCheckIn = checkIns?.find(
+  //   (c) => c.userId === session?.user?.id
+  // );
 
   return (
     <>
@@ -135,14 +105,14 @@ export function CheckInStatusBar({
             />
           </div>
 
-          {currentUserCheckIn && !currentUserCheckIn.checkoutAt && (
+          {/* {currentUserCheckIn && !currentUserCheckIn.checkoutAt && (
             <div className="mt-4">
               <CheckoutDialog
                 teamId={teamId}
                 checkInId={currentUserCheckIn.id}
               />
             </div>
-          )}
+          )} */}
         </CardContent>
       </Card>
 
