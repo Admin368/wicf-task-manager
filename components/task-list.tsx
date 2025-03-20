@@ -43,7 +43,6 @@ export function TaskList({
 
   // const formattedDate = selectedDate.toISOString().split("T")[0];
   const formattedDate = format(selectedDate, "yyyy-MM-dd");
-  console.log({ formattedDate });
   // Fetch tasks and completions for the specific team
   const {
     data,

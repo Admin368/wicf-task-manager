@@ -45,7 +45,6 @@ export function ForgotPasswordForm({
       });
 
       if (!response.ok) {
-        console.log(response);
         const message = await response.statusText;
         setError(message || "Something went wrong. Please try again.");
         toast.error(message || "Something went wrong. Please try again.");
