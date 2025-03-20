@@ -78,6 +78,7 @@ export function TaskList({
     data: teamMembers,
     isLoading: isLoadingMembers,
     error: membersError,
+    refetch: refetchMembers,
   } = api.users.getTeamMembers.useQuery(
     { teamId },
     {
@@ -377,6 +378,7 @@ export function TaskList({
             teamId={teamId}
             teamMembers={teamMembers}
             onClose={() => setShowUserList(false)}
+            refetch={refetchMembers}
           />
         )}
 

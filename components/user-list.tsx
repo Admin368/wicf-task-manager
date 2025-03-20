@@ -47,6 +47,7 @@ interface UserListProps {
   onClose: () => void;
   showTime?: boolean;
   teamId: string;
+  refetch?: () => void;
 }
 
 export function UserList({
@@ -54,6 +55,7 @@ export function UserList({
   onClose,
   showTime,
   teamId,
+  refetch,
 }: UserListProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
@@ -64,6 +66,7 @@ export function UserList({
         title: "Role updated",
         description: "The member's role has been updated successfully",
       });
+      refetch?.();
     },
     onError: (error) => {
       toast({
