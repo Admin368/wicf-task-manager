@@ -28,6 +28,7 @@ interface TaskAssignmentDialogProps {
   teamMembers?: any[];
   taskAssignments?: any[];
   refetchMembers?: () => void;
+  hideButtonBorder?: boolean;
 }
 
 export function TaskAssignmentDialog({
@@ -37,6 +38,7 @@ export function TaskAssignmentDialog({
   teamMembers: initialTeamMembers,
   taskAssignments,
   refetchMembers,
+  hideButtonBorder = false,
 }: TaskAssignmentDialogProps) {
   const [open, setOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(
@@ -132,8 +134,8 @@ export function TaskAssignmentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          {/* <UserPlus className="h-4 w-4 mr-2" /> */}
+        <Button variant={hideButtonBorder ? "ghost" : "outline"} size="sm">
+          <UserPlus className="h-4 mr-1" />
           Assignment{" "}
         </Button>
       </DialogTrigger>

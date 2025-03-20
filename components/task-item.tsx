@@ -227,7 +227,7 @@ export function TaskItem({
   const isThisTaskAssignedToMe = assignedUsers.some(
     (user) => user?.id === userId
   );
-  if (!isThisTaskAssignedToMe && hideNotAssignedToMe) {
+  if (!isThisTaskAssignedToMe && hideNotAssignedToMe && !childTasks.length) {
     return null;
   }
 
@@ -281,6 +281,12 @@ export function TaskItem({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => onAddSubtask?.(task.id)}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Subtask
+                          </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             {task.teamId && (
                               <TaskAssignmentDialog
@@ -290,6 +296,7 @@ export function TaskItem({
                                 teamMembers={teamMembers}
                                 taskAssignments={task.assignments}
                                 refetchMembers={refetch}
+                                hideButtonBorder={true}
                               />
                             )}
                           </DropdownMenuItem>
@@ -303,12 +310,6 @@ export function TaskItem({
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onAddSubtask?.(task.id)}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Subtask
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                       <Button
@@ -320,16 +321,15 @@ export function TaskItem({
                       >
                         <ArrowUp className="h-4 w-4" />
                       </Button>
-                      {!isLast && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onMoveTask?.(task.id, "down")}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onMoveTask?.(task.id, "down")}
+                        disabled={isLast}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
@@ -367,26 +367,24 @@ export function TaskItem({
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
-                      {!isFirst && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onMoveTask?.(task.id, "up")}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {!isLast && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onMoveTask?.(task.id, "down")}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onMoveTask?.(task.id, "up")}
+                        disabled={isFirst}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onMoveTask?.(task.id, "down")}
+                        disabled={isLast}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
                     </>
                   )}
                 </div>
@@ -412,7 +410,14 @@ export function TaskItem({
                   {
                     teamMembers.find((member) => member.id === completedBy)
                       ?.name
-                  }
+                  }{" "}
+                  {`at ${format(
+                    new Date(
+                      completions.find((c) => c.taskId === task.id)
+                        ?.completedAt ?? new Date()
+                    ),
+                    "HH:mm"
+                  )}`}
                 </span>
               </div>
             )}
