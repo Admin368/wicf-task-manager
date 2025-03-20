@@ -307,8 +307,8 @@ export function TeamsList() {
             <div className="text-center p-12 border rounded-lg bg-muted/50">
               <h3 className="text-lg font-medium mb-2">No Joined Teams</h3>
               <p className="text-muted-foreground mb-4">
-                You haven't joined any teams yet. Search for teams to join or
-                create your own.
+                {`You haven't joined any teams yet. Search for teams to join or
+                create your own.`}
               </p>
               <Button onClick={() => setActiveTab("search")}>
                 Search Teams

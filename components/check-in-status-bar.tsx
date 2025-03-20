@@ -69,7 +69,7 @@ export function CheckInStatusBar({
                 <Users className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-medium">Today's Check-ins</h3>
+                <h3 className="font-medium">{`Today's Check-ins`}</h3>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(), "EEEE, MMMM do")}
                 </p>
@@ -112,7 +112,7 @@ export function CheckInStatusBar({
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Calendar className="mr-2 h-5 w-5" />
-              <span>Today's Check-ins</span>
+              <span>{`Today's Check-ins`}</span>
               <span className="ml-auto text-sm font-normal text-muted-foreground">
                 {format(new Date(), "EEEE, MMMM do")}
               </span>
