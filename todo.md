@@ -33,8 +33,8 @@
     - checkout time {cm:2025-03-21}
     - rate how the day was put of 5 stars {cm:2025-03-21}
     - write notes {cm:2025-03-21}
-    - add it on the tabs on team page
-    - checkout history with notes (so can be used as summary) and overal rating
+    - add it on the tabs on team page {cm:2025-03-21}
+    - checkout history with notes (so can be used as summary) and overal rating {cm:2025-03-21}
 
   - If teams already Joined no need for password {cm:2025-03-20}
   - UserList Broken {cm:2025-03-21}

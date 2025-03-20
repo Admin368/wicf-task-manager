@@ -106,7 +106,10 @@ export default function TeamPage() {
       },
     }
   );
-  const isCheckedIn = checkIns?.some((checkIn) => checkIn.userId === userId);
+  // const isCheckedIn = checkIns?.some((checkIn) => checkIn.userId === userId);
+  const checkIn = checkIns?.find((checkIn) => checkIn.userId === userId);
+  console.log(checkIn);
+  const isCheckedIn = checkIn ? true : false;
   // Get current user's role
   const currentUserRole = teamMembers?.find(
     (member: any) => member.id === userId
@@ -189,11 +192,15 @@ export default function TeamPage() {
             <ExternalLink className="h-4 w-4 mr-2" />
             View Full Check-in History
           </Button>
-          <CheckoutDialog
-            isDisabled={!isCheckedIn}
-            teamId={team.id}
-            userId={userId}
-          />
+          {checkIn && (
+            <CheckoutDialog
+              isDisabled={!isCheckedIn}
+              // teamId={team.id}
+              // userId={userId}
+              checkInData={checkIn}
+              refetch={refreshCheckIns}
+            />
+          )}
 
           {isAdmin && (
             <AlertDialog>
@@ -231,7 +238,7 @@ export default function TeamPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
-              <TabsTrigger value="checkins">Check Ins</TabsTrigger>
+              <TabsTrigger value="checkins">Review</TabsTrigger>
             </TabsList>
             <TabsContent value="tasks">
               <TaskList

@@ -104,15 +104,6 @@ export function CheckInStatusBar({
               style={{ width: `${percentage}%` }}
             />
           </div>
-
-          {/* {currentUserCheckIn && !currentUserCheckIn.checkoutAt && (
-            <div className="mt-4">
-              <CheckoutDialog
-                teamId={teamId}
-                checkInId={currentUserCheckIn.id}
-              />
-            </div>
-          )} */}
         </CardContent>
       </Card>
 

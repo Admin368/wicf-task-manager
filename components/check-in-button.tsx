@@ -132,7 +132,7 @@ export function CheckInButton({
             <div className="space-y-2">
               <p className="text-sm font-medium">Notes (optional)</p>
               <Textarea
-                placeholder="Add any notes about your day..."
+                placeholder="Add notes for the day, you can update when checking out..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}

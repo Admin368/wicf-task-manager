@@ -12,57 +12,64 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/trpc/client";
 import { Loader2, LogOut } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { StarRating } from "./star-rating";
+import { serverGetCheckInsReturnType } from "@/server/api/routers/check-ins";
 
 interface CheckoutDialogProps {
-  teamId: string;
-  userId?: string;
+  // teamId: string;
+  // userId?: string;
+  // checkInId: string;
   isDisabled?: boolean;
+  checkInData?: serverGetCheckInsReturnType;
+  refetch: () => void;
 }
 
 export function CheckoutDialog({
-  teamId,
-  userId,
+  // teamId,
+  // userId,
   isDisabled = false,
+  checkInData,
+  refetch,
 }: CheckoutDialogProps) {
   const [open, setOpen] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [notes, setNotes] = useState("");
+  const [rating, setRating] = useState(checkInData?.rating || 0);
+  const [notes, setNotes] = useState(checkInData?.notes || "");
 
   // const utils = api.useContext();
 
   const checkout = api.checkIns.checkout.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Checked out successfully",
+      toast.success("Checked out successfully", {
         description: "Your daily checkout has been recorded",
       });
       setOpen(false);
-      // utils.checkIns.getByTeam.invalidate({ teamId });
+      refetch();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
+      toast.error("Failed to checkout", {
         description: error.message || "Failed to checkout",
-        variant: "destructive",
       });
     },
   });
 
   const handleCheckout = async () => {
     if (rating === 0) {
-      toast({
-        title: "Rating required",
+      toast.error("Rating required", {
         description: "Please rate your day before checking out",
-        variant: "destructive",
       });
       return;
     }
 
     try {
+      if (!checkInData?.id) {
+        toast.error("Check-in ID not found", {
+          description: "Please try again",
+        });
+        return;
+      }
       await checkout.mutateAsync({
-        checkInId: userId || "",
+        checkInId: checkInData?.id,
         rating,
         notes,
       });
@@ -78,10 +85,12 @@ export function CheckoutDialog({
           className="w-full h-16 text-lg font-semibold"
           size="lg"
           variant="default"
-          disabled={isDisabled}
+          disabled={isDisabled || !!checkInData?.checkoutAt}
         >
           <LogOut className="h-4 w-4 mr-2 text-green-500" />
-          Done for the Day (Checkout)
+          {checkInData?.checkoutAt
+            ? `Already Checked Out ✅`
+            : `Done for the Day (Checkout)`}
         </Button>
       </DialogTrigger>
       <DialogContent>
