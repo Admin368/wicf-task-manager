@@ -3,6 +3,7 @@ import path from "path";
 import { MDXRemote } from "next-mdx-remote/rsc";
 // import Image from "next/image";
 import { DetailedHTMLProps, ImgHTMLAttributes } from "react";
+import { GuideVideoSection } from "@/components/guide-video-section";
 
 const components = {
   img: (
@@ -42,6 +43,10 @@ export default async function GuidePage() {
 
   return (
     <div className="container mx-auto py-8 px-4">
+      {/* Video Tutorial Section */}
+      <GuideVideoSection />
+
+      {/* Guide Content */}
       <div className="prose prose-sm sm:prose lg:prose-lg xl:prose-xl mx-auto dark:prose-invert">
         <MDXRemote source={fileContent} components={components} />
       </div>
