@@ -48,6 +48,7 @@ export function TeamsList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const { userId, userName, isLoading: isUserLoading } = useUser();
+  const [isEnteringTeam, setIsEnteringTeam] = useState<string | null>(null);
 
   const { data: allTeams, isLoading: isAllTeamsLoading } =
     api.teams.getAll.useQuery<APITeam[]>();
@@ -169,14 +170,20 @@ export function TeamsList() {
         </CardHeader>
         <CardContent>
           <Button
+            disabled={!!isEnteringTeam}
             className="w-full"
-            onClick={() =>
+            onClick={() => {
+              setIsEnteringTeam(team.id);
               isJoined
                 ? router.push(`/team/${team.slug}`)
-                : router.push(`/team/${team.slug}/join`)
-            }
+                : router.push(`/team/${team.slug}/join`);
+            }}
           >
-            {isJoined ? "Enter Team" : "Join Team"}
+            {isEnteringTeam
+              ? "Joining..."
+              : isJoined
+              ? "Enter Team"
+              : "Join Team"}
           </Button>
         </CardContent>
         <CardFooter>
