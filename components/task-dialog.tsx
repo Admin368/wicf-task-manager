@@ -173,7 +173,8 @@ export function TaskDialog({
                   setParentId(value === "none" ? null : value)
                 }
                 disabled={
-                  isSubmitting || !!(initialData?.parentId && !initialData?.id)
+                  // isSubmitting || !!(initialData?.parentId && !initialData?.id)
+                  isSubmitting
                 }
               >
                 <SelectTrigger id="parent" className="col-span-3">
