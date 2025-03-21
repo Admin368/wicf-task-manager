@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 interface TaskDialogProps {
   open: boolean;
@@ -50,12 +51,55 @@ export function TaskDialog({
     initialData?.parentId || null
   );
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setParentId(initialData?.parentId || null);
+    // When initialData changes, update the form
+    if (initialData) {
+      // If it has a parentId, set it (used when adding subtasks)
+      if (initialData.parentId) {
+        setParentId(initialData.parentId);
+      }
+
+      // If it has a title, set it (used when editing tasks)
+      if (initialData.title) {
+        setTaskTitle(initialData.title);
+      } else {
+        // For new subtasks, reset the title
+        setTaskTitle("");
+      }
+    } else {
+      // Reset form for completely new tasks
+      setTaskTitle("");
+      setParentId(null);
+    }
+
+    // Reset error and submission state
+    setError("");
+    setIsSubmitting(false);
   }, [initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open && !initialData?.id) {
+      // Only reset the title if it's a new top-level task (no parentId)
+      if (!initialData?.parentId) {
+        setTaskTitle("");
+        setParentId(null);
+      }
+      setError("");
+      setIsSubmitting(false);
+    }
+  }, [open, initialData]);
+
+  // Add logging to see what's happening
+  useEffect(() => {
+    if (initialData?.parentId) {
+      const parent = tasks.find((t) => t.id === initialData.parentId);
+    }
+  }, [initialData, tasks]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!taskTitle.trim()) {
@@ -63,25 +107,40 @@ export function TaskDialog({
       return;
     }
 
-    onSubmit({
-      title: taskTitle,
-      parentId,
-    });
+    setIsSubmitting(true);
 
-    // Reset form
-    setTaskTitle("");
-    setParentId(null);
-    setError("");
+    try {
+      await onSubmit({
+        title: taskTitle,
+        parentId,
+      });
+
+      // Don't reset form here - it will be reset when dialog closes or reopens
+    } catch (error) {
+      console.error("Error submitting task:", error);
+      setError("Failed to save task. Please try again.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>
+            {initialData?.id
+              ? "Edit Task"
+              : initialData?.parentId
+              ? "Add Subtask"
+              : "Add Task"}
+          </DialogTitle>
           <DialogDescription>
-            {initialData
+            {initialData?.id
               ? "Edit the task details below."
+              : initialData?.parentId
+              ? `Adding subtask to "${
+                  tasks.find((t) => t.id === initialData.parentId)?.title || ""
+                }"`
               : "Add a new task to the checklist."}
           </DialogDescription>
         </DialogHeader>
@@ -100,6 +159,7 @@ export function TaskDialog({
                 }}
                 className="col-span-3"
                 autoFocus
+                disabled={isSubmitting}
               />
             </div>
 
@@ -112,9 +172,17 @@ export function TaskDialog({
                 onValueChange={(value) =>
                   setParentId(value === "none" ? null : value)
                 }
+                disabled={
+                  isSubmitting || !!(initialData?.parentId && !initialData?.id)
+                }
               >
                 <SelectTrigger id="parent" className="col-span-3">
-                  <SelectValue placeholder="None (Top Level)" />
+                  <SelectValue>
+                    {parentId
+                      ? tasks.find((t) => t.id === parentId)?.title ||
+                        "Loading..."
+                      : "None (Top Level)"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (Top Level)</SelectItem>
@@ -134,11 +202,31 @@ export function TaskDialog({
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
-            <Button type="submit">
-              {initialData ? "Save Changes" : "Add Task"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {initialData?.id
+                    ? "Saving..."
+                    : initialData?.parentId
+                    ? "Adding Subtask..."
+                    : "Adding..."}
+                </>
+              ) : initialData?.id ? (
+                "Save Changes"
+              ) : initialData?.parentId ? (
+                "Add Subtask"
+              ) : (
+                "Add Task"
+              )}
             </Button>
           </DialogFooter>
         </form>

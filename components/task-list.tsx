@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Task } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import { toast } from "sonner";
 
 interface TeamMember {
   id: string;
@@ -122,10 +123,13 @@ export function TaskList({
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetch?.();
+      await refetch?.();
       setShowTaskDialog(false);
+      toast.success("Task created successfully");
+      return true;
     } catch (error) {
       console.error("Failed to create task:", error);
+      throw error;
     }
   };
   const onEditTask = (task: Task) => {
@@ -148,11 +152,14 @@ export function TaskList({
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
-      refetch?.();
+      await refetch?.();
       setEditingTask(null);
       setShowTaskDialog(false);
+      toast.success("Task updated successfully");
+      return true;
     } catch (error) {
       console.error("Failed to update task:", error);
+      throw error;
     }
   };
 
@@ -181,9 +188,16 @@ export function TaskList({
     // Find the parent task
     const parentTask = tasks?.find((t: Task) => t.id === parentId);
     if (parentTask) {
-      // Set the initial data with parentId
-      setEditingTask({ parentId });
+      // For subtasks, we need to set empty initial data with just the parentId
+      setEditingTask({
+        parentId,
+        // Don't set an ID to make it clear this is a new task
+        title: "",
+      });
       setShowTaskDialog(true);
+    } else {
+      toast.error("Parent task not found");
+      console.error("Parent task not found:", parentId);
     }
   };
 
