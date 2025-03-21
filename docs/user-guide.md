@@ -11,6 +11,8 @@
 - Task assignment to specific team members
 - Task reordering and organization
 - Team statistics and activity History
+- Team cloning functionality
+- Private team options
 
 ## Introduction
 
@@ -32,8 +34,10 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 1. Click the "Create Team" button on the home page
 2. Enter your team name
 3. Set a team password
-4. Share the team name and password with your team members
-5. As creator, you will be the team admin, you can make other members admin as well
+4. Choose whether to make the team private (hidden from public lists)
+5. Choose whether to allow team cloning by members
+6. Share the team name and password with your team members
+7. As creator, you will be the team admin, you can make other members admin as well
 
 #### Joining a Team
 
@@ -51,6 +55,7 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 - Tasks maintain their order and can be reordered as needed
 - Each task can be marked as complete/incomplete for each day
 - Tasks can be assigned to specific team members
+- You can filter to see only tasks assigned to you
 
 ### Creating Tasks (Admin Only)
 
@@ -69,10 +74,12 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 
 ### Task Assignment
 
-1. As an admin, click the assignment icon next to a task
+1. As an admin, click the assignment icon next to a task or use the dropdown menu and select "Manage Assignments"
 2. Select team members to assign to the task
 3. Save the assignments
 4. Assigned members will see their assigned tasks highlighted
+5. Users can filter to view only tasks assigned to them
+6. Assigned users are displayed under the task with their names
 
 ### Completing Tasks
 
@@ -112,6 +119,24 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 - See member roles (Admin/Member)
 - Check who is currently active
 - Admins can ban problematic members
+
+### Team Visibility & Privacy
+
+- Teams can be set as private or public when creating them
+- Private teams are hidden from the main teams list on the home page
+- Private teams can only be joined with a direct link or by knowing the team name
+- Team admins can change privacy settings from the team settings page
+
+### Team Cloning
+
+1. Team owners can enable or disable team cloning in team settings
+2. When enabled, any team member can create a copy of the team
+3. To clone a team, click the "Make own copy of this team" button on the team page
+4. Enter a new team name and password for your cloned team
+5. Choose whether to make your cloned team private
+6. All tasks and subtasks from the original team are copied to your new team
+7. You become the admin of your cloned team
+8. Cloned teams have cloning disabled by default (you can enable it in settings)
 
 ## Admin Features
 
