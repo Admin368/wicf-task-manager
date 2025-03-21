@@ -36,6 +36,7 @@ import { CheckoutDialog } from "@/components/checkout-dialog";
 import { format } from "date-fns";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/date-picker";
+import { CloneTeamButton } from "@/components/clone-team-button";
 
 export default function TeamPage() {
   const params = useParams();
@@ -201,6 +202,14 @@ export default function TeamPage() {
             <Copy className="h-4 w-4 mr-2" />
             Copy Invite Message
           </Button>
+
+          {team.isCloneable && (
+            <CloneTeamButton
+              teamId={team.id}
+              teamName={team.name}
+              isCloneable={team.isCloneable}
+            />
+          )}
 
           <Button
             variant="outline"

@@ -15,6 +15,7 @@ model Team {
   createdAt DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
   isDeleted Boolean      @default(false) @map("is_deleted")
   isPrivate Boolean      @default(false) @map("is_private")
+  isCloneable Boolean    @default(false) @map("is_cloneable")
   checkIns  CheckIn[]
   tasks     Task[]
   members   TeamMember[]

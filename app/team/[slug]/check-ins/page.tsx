@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/router";
+import { useRouter, useParams } from "next/navigation";
 import { format, parseISO, subDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,8 +39,8 @@ interface CheckIn {
 
 export default function CheckInsPage() {
   const router = useRouter();
-  const query = router.query || undefined;
-  const slug = query?.slug as string;
+  const params = useParams();
+  const slug = params?.slug as string;
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [teamLoaded, setTeamLoaded] = useState(false);
 

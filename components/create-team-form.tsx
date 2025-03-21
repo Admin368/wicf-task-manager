@@ -25,6 +25,7 @@ export function CreateTeamForm() {
   const [teamName, setTeamName] = useState("");
   const [password, setPassword] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isCloneable, setIsCloneable] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect to login if not authenticated
@@ -78,6 +79,7 @@ export function CreateTeamForm() {
         name: teamName,
         password,
         isPrivate,
+        isCloneable,
       });
     } catch (error) {
       // Error is handled in the mutation
@@ -131,6 +133,19 @@ export function CreateTeamForm() {
             <p className="text-xs text-muted-foreground">
               {`Private teams won't be listed on the home page and can only be
               joined with a direct invite link.`}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="cloneable-mode"
+                checked={isCloneable}
+                onCheckedChange={setIsCloneable}
+              />
+              <Label htmlFor="cloneable-mode">Allow team cloning</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {`When enabled, members can clone this team to create their own version with all tasks intact.`}
             </p>
           </div>
         </CardContent>

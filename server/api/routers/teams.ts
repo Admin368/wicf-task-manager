@@ -13,6 +13,7 @@ type TeamInput = {
   name: string;
   password: string;
   isPrivate?: boolean;
+  isCloneable?: boolean;
 };
 
 type JoinInput = {
@@ -202,6 +203,7 @@ export const teamsRouter = router({
         name: z.string().min(1),
         password: z.string().min(4),
         isPrivate: z.boolean().optional(),
+        isCloneable: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }: { ctx: Context; input: TeamInput }) => {
@@ -233,6 +235,7 @@ export const teamsRouter = router({
               slug,
               password: hashedPassword,
               isPrivate: input.isPrivate || false,
+              isCloneable: input.isCloneable || false,
             },
           });
 
@@ -482,6 +485,7 @@ export const teamsRouter = router({
         teamId: z.string().uuid(),
         name: z.string().min(1).optional(),
         isPrivate: z.boolean().optional(),
+        isCloneable: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -529,6 +533,10 @@ export const teamsRouter = router({
 
         if (input.isPrivate !== undefined) {
           updateData.isPrivate = input.isPrivate;
+        }
+
+        if (input.isCloneable !== undefined) {
+          updateData.isCloneable = input.isCloneable;
         }
 
         // Update team
@@ -613,6 +621,163 @@ export const teamsRouter = router({
       } catch (error) {
         console.error("Error updating team password:", error);
         throw error;
+      }
+    }),
+
+  cloneTeam: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        newTeamName: z.string().min(1),
+        newTeamPassword: z.string().min(4),
+        isPrivate: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        if (!ctx.userId) throw new Error("User ID is required");
+        const userId = ctx.userId;
+
+        // Verify the user is a member of the team being cloned
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: userId,
+            },
+          },
+        });
+
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You must be a member of the team to clone it",
+          });
+        }
+
+        // Check if the team is cloneable
+        const sourceTeam = await ctx.prisma.team.findUnique({
+          where: { id: input.teamId },
+        });
+
+        if (!sourceTeam || !sourceTeam.isCloneable) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "This team does not allow cloning",
+          });
+        }
+
+        // Generate slug from new name
+        let slug = slugify(input.newTeamName);
+
+        // Check if slug already exists
+        const existingTeam = await ctx.prisma.team.findUnique({
+          where: { slug },
+        });
+
+        // If slug exists, append a random number
+        if (existingTeam) {
+          slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
+        }
+
+        // Hash the password
+        const hashedPassword = await hashPassword(input.newTeamPassword);
+
+        // Clone the team and its tasks in a transaction
+        const newTeam = await ctx.prisma.$transaction(async (prisma) => {
+          // Create new team
+          const team = await prisma.team.create({
+            data: {
+              name: input.newTeamName,
+              slug,
+              password: hashedPassword,
+              isPrivate: input.isPrivate ?? false,
+              isCloneable: false, // Default to not cloneable for cloned teams
+            },
+          });
+
+          // Add current user as admin
+          await prisma.teamMember.create({
+            data: {
+              teamId: team.id,
+              userId,
+              role: "admin",
+            },
+          });
+
+          // Get all tasks from the source team
+          const tasks = await prisma.task.findMany({
+            where: {
+              teamId: input.teamId,
+              isDeleted: false,
+              parentId: null, // Get top-level tasks first
+            },
+            orderBy: {
+              position: "asc",
+            },
+          });
+
+          // Map to track original task ID to new task ID
+          const taskIdMap = new Map();
+
+          // Clone top-level tasks
+          for (const task of tasks) {
+            const newTask = await prisma.task.create({
+              data: {
+                title: task.title,
+                position: task.position,
+                teamId: team.id,
+              },
+            });
+            taskIdMap.set(task.id, newTask.id);
+          }
+
+          // Get and clone child tasks (iteratively to handle any nesting level)
+          const processedParentIds = Array.from(taskIdMap.keys());
+          while (processedParentIds.length > 0) {
+            const parentId = processedParentIds.shift();
+
+            // Find children of this parent
+            const childTasks = await prisma.task.findMany({
+              where: {
+                parentId,
+                isDeleted: false,
+              },
+              orderBy: {
+                position: "asc",
+              },
+            });
+
+            // Clone each child task
+            for (const childTask of childTasks) {
+              const newTask = await prisma.task.create({
+                data: {
+                  title: childTask.title,
+                  position: childTask.position,
+                  teamId: team.id,
+                  parentId: taskIdMap.get(childTask.parentId!),
+                },
+              });
+
+              // Add this task's ID to the map and queue
+              taskIdMap.set(childTask.id, newTask.id);
+              if (childTask.id) {
+                processedParentIds.push(childTask.id);
+              }
+            }
+          }
+
+          return team;
+        });
+
+        return newTeam;
+      } catch (error) {
+        console.error("Error cloning team:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "An error occurred while cloning the team",
+        });
       }
     }),
 });

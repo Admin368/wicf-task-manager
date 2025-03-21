@@ -50,6 +50,7 @@ export default function TeamSettingsPage() {
 
   const [teamName, setTeamName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isCloneable, setIsCloneable] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -68,6 +69,7 @@ export default function TeamSettingsPage() {
         if (data?.team) {
           setTeamName(data.team.name);
           setIsPrivate(data.team.isPrivate || false);
+          setIsCloneable(data.team.isCloneable || false);
         }
       },
       onError: () => {
@@ -152,6 +154,7 @@ export default function TeamSettingsPage() {
       teamId: teamData.team.id,
       name: teamName,
       isPrivate,
+      isCloneable,
     });
   };
 
@@ -303,6 +306,18 @@ export default function TeamSettingsPage() {
                   Private Team (hidden from home page)
                 </Label>
               </div>
+
+              <div className="flex items-center space-x-2 mt-4">
+                <Switch
+                  id="cloneable-mode"
+                  checked={isCloneable}
+                  onCheckedChange={setIsCloneable}
+                />
+                <Label htmlFor="cloneable-mode">Allow team cloning</Label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {`When enabled, members can clone this team to create their own version with all tasks intact.`}
+              </p>
             </CardContent>
             <CardFooter>
               <Button type="submit" disabled={isSubmitting}>
