@@ -37,6 +37,7 @@ import {
   serverGetTasksReturnType,
 } from "@/server/api/routers/tasks";
 // import { Task } from "@prisma/client";
+import { TaskCompletionTime } from "./task-completion-time";
 
 interface TaskItemProps {
   task: serverGetTasksReturnType;
@@ -139,7 +140,11 @@ export function TaskItem({
       setIsCompleted(true);
       setCompletedBy(completion.userId);
       setCompletedAt(
-        completion.completionDate ? new Date(completion.completionDate) : null
+        completion.completedAt
+          ? new Date(completion.completedAt)
+          : completion.completionDate
+          ? new Date(completion.completionDate)
+          : null
       );
     } else {
       setIsCompleted(false);
@@ -341,10 +346,10 @@ export function TaskItem({
                     <span>Completed by: {completerName}</span>
                   </div>
                   {completedAt && (
-                    <div className="flex items-center gap-1 md:ml-2">
-                      <CalendarClock className="h-3 w-3" />
-                      <span>at {format(completedAt, "MMM d, h:mm a")}</span>
-                    </div>
+                    <TaskCompletionTime
+                      completedAt={completedAt}
+                      className="md:ml-2"
+                    />
                   )}
                 </div>
               )}
