@@ -1,42 +1,24 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "@/lib/trpc/server";
-import { publicProcedure } from "@/lib/trpc/server";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { middleware, publicProcedure } from "@/lib/trpc/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-export const withSupabase = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.supabase) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Supabase client not available",
-    });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      supabase: ctx.supabase,
-    },
-  });
-});
-
-// Simplified authentication that doesn't require login
-// In a production application, you would want to use proper auth
-export const isAuthenticated = t.middleware(async ({ ctx, next }) => {
-  // Get the user ID from headers (set by the client)
-  const userId = ctx.headers.get("x-user-id");
-  
-  if (!userId) {
+const isAuthed = middleware(async (opts) => {
+  const session = await getServerSession(authOptions);
+  // console.log("session", session);
+  if (!session?.user?.id) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
-      message: "User ID not found in request, refresh the page and try again.",
+      message: "You must be logged in to access this resource",
     });
   }
-  
-  return next({
+
+  return opts.next({
     ctx: {
-      ...ctx,
-      userId,
+      ...opts.ctx,
+      userId: session.user.id,
     },
   });
 });
 
-export const protectedProcedure = publicProcedure.use(withSupabase).use(isAuthenticated);
+export const protectedProcedure = publicProcedure.use(isAuthed);

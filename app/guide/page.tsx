@@ -1,10 +1,19 @@
 import fs from "fs";
 import path from "path";
 import { MDXRemote } from "next-mdx-remote/rsc";
-import Image from "next/image";
+// import Image from "next/image";
+import { DetailedHTMLProps, ImgHTMLAttributes } from "react";
 
 const components = {
-  img: ({ src, alt }: { src: string; alt: string }) => {
+  img: (
+    props: DetailedHTMLProps<
+      ImgHTMLAttributes<HTMLImageElement>,
+      HTMLImageElement
+    >
+  ) => {
+    const { src, alt } = props;
+    if (!src) return null;
+
     if (src.startsWith("[Screenshot placeholder:")) {
       return (
         <div className="my-4 p-4 border-2 border-dashed border-gray-300 rounded-lg">
@@ -16,9 +25,9 @@ const components = {
       );
     }
     return (
-      <Image
+      <img
         src={src}
-        alt={alt}
+        alt={alt || ""}
         width={800}
         height={600}
         className="rounded-lg my-4"

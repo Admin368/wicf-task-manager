@@ -18,6 +18,8 @@ import {
   Copy,
   Shield,
   ShieldOff,
+  Ban,
+  LogOut,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
@@ -28,24 +30,32 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { api } from "@/lib/trpc/client";
+import { useSession } from "next-auth/react";
+import { StarRating } from "@/components/ui/star-rating";
+import { serverGetTeamMembersReturnType } from "@/server/api/routers/users";
 
-interface TeamMember {
-  id: string;
-  name: string;
-  email?: string | null;
-  avatar_url?: string | null;
-  role: string;
-  notes?: string | null;
-  checkedInAt?: string | null;
-}
+// interface TeamMember {
+//   id: string;
+//   name: string;
+//   email: string | null;
+//   avatarUrl: string | null;
+//   role: string | null;
+//   notes?: string | null;
+//   checkedInAt?: string | null;
+//   isBanned?: boolean;
+//   rating?: number | null;
+//   checkoutAt?: string | null;
+// }
 
 interface UserListProps {
-  teamMembers: TeamMember[];
-  onClose: () => void;
+  teamMembers: serverGetTeamMembersReturnType[];
+  onClose?: () => void;
   showTime?: boolean;
-  teamId?: string;
+  teamId: string;
+  refetch?: () => void;
+  isAdmin?: boolean;
 }
 
 export function UserList({
@@ -53,41 +63,58 @@ export function UserList({
   onClose,
   showTime,
   teamId,
+  refetch,
+  isAdmin = false,
 }: UserListProps) {
-  const { userId } = useUser();
-
-  // Check if current user is admin
-  const isAdmin = teamMembers?.find(
-    (member) =>
-      member.id === userId &&
-      (member.role === "admin" || member.role === "owner")
-  );
-
-  const utils = api.useContext();
-  const updateRole = api.users.updateRole.useMutation({
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const isUserAdmin =
+    teamMembers.find((member) => member.id === userId)?.role === "admin";
+  const updateRole = api.teams.updateMemberRole.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "User role updated successfully.",
+      toast.success("Role updated", {
+        description: "The member's role has been updated successfully",
       });
-      // Refetch team members to update the UI
-      if (teamId) {
-        utils.users.getTeamMembers.invalidate({ teamId });
-      }
+      refetch?.();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update user role.",
-        variant: "destructive",
+      toast.error("Error", {
+        description: error.message || "Failed to update role",
+      });
+    },
+  });
+
+  const banUser = api.users.banUser.useMutation({
+    onSuccess: () => {
+      toast.success("User banned", {
+        description: "The user has been banned from the team",
+      });
+      refetch?.();
+    },
+    onError: (error) => {
+      toast.error("Error", {
+        description: error.message || "Failed to ban user",
+      });
+    },
+  });
+
+  const unbanUser = api.users.unbanUser.useMutation({
+    onSuccess: () => {
+      toast.success("User unbanned", {
+        description: "The user has been unbanned from the team",
+      });
+      refetch?.();
+    },
+    onError: (error) => {
+      toast.error("Error", {
+        description: error.message || "Failed to unban user",
       });
     },
   });
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast({
-      title: "Copied",
+    toast.success("Copied", {
       description: "User ID copied to clipboard",
     });
   };
@@ -109,7 +136,34 @@ export function UserList({
     }
   };
 
-  const getRoleColor = (role: string) => {
+  const handleBanUser = async (memberId: string) => {
+    if (!teamId) return;
+
+    try {
+      await banUser.mutateAsync({
+        teamId,
+        userId: memberId,
+      });
+    } catch (error) {
+      console.error("Failed to ban user:", error);
+    }
+  };
+
+  const handleUnbanUser = async (memberId: string) => {
+    if (!teamId) return;
+
+    try {
+      await unbanUser.mutateAsync({
+        teamId,
+        userId: memberId,
+      });
+    } catch (error) {
+      console.error("Failed to unban user:", error);
+    }
+  };
+
+  const getRoleColor = (role: string | null) => {
+    if (!role) return "bg-secondary text-secondary-foreground";
     switch (role.toLowerCase()) {
       case "admin":
         return "bg-primary text-primary-foreground";
@@ -120,7 +174,8 @@ export function UserList({
     }
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: string | null) => {
+    if (!role) return <User className="h-3 w-3 mr-1" />;
     switch (role.toLowerCase()) {
       case "admin":
       case "owner":
@@ -138,6 +193,9 @@ export function UserList({
             {showTime ? "Checked-in Members" : "Team Members"}
           </CardTitle>
           <CardDescription>
+            {isUserAdmin || isAdmin ? "Admin" : "Member"}
+          </CardDescription>
+          <CardDescription>
             {teamMembers.length}{" "}
             {teamMembers.length === 1 ? "member" : "members"}{" "}
             {showTime ? "checked in" : "in the team"}
@@ -152,97 +210,139 @@ export function UserList({
           {teamMembers.map((member) => (
             <div
               key={member.id}
-              className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group"
+              className="p-3 rounded-md hover:bg-muted group"
             >
-              <Avatar>
-                <AvatarFallback>
-                  {member.name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-grow">
-                <div className="font-medium">
-                  {member.name}
-                  {member.id === userId && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      Me
-                    </Badge>
-                  )}
-                </div>
-                {member.email && (
-                  <div className="text-sm text-muted-foreground">
-                    {member.email}
+              <div className="flex flex-wrap gap-3">
+                {/* Avatar and name - always on first line */}
+                <div className="flex items-center gap-2 flex-grow min-w-0 mb-1">
+                  <Avatar className="flex-shrink-0">
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} alt={member.name} />
+                    ) : (
+                      <AvatarFallback>
+                        {member.name
+                          ? member.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                          : "?"}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">
+                      {member.name}
+                      {member.id === userId && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          Me
+                        </Badge>
+                      )}
+                    </div>
+                    {member.email && (
+                      <div className="text-sm text-muted-foreground truncate">
+                        {member.email}
+                      </div>
+                    )}
                   </div>
-                )}
-                {member.notes && (
-                  <div className="text-sm italic mt-1">{member.notes}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex flex-col items-end gap-2">
-                  {member.role && (
-                    <Badge
-                      variant="secondary"
-                      className={`flex items-center ${getRoleColor(
-                        member.role
-                      )}`}
-                    >
-                      {getRoleIcon(member.role)}
-                      {member.role.charAt(0).toUpperCase() +
-                        member.role.slice(1)}
-                    </Badge>
-                  )}
-                  {showTime && member.checkedInAt && (
-                    <Badge
-                      variant="outline"
-                      className="flex items-center text-xs"
-                    >
-                      <Clock className="h-3 w-3 mr-1" />
-                      {format(new Date(member.checkedInAt), "h:mm a")}
-                    </Badge>
-                  )}
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleCopyId(member.id)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy ID
-                    </DropdownMenuItem>
+                {/* Badges and actions - on second line in mobile, aligned right on desktop */}
+                <div className="flex items-center gap-2 flex-wrap w-full md:w-auto md:ml-auto">
+                  {member.isBanned && (
+                    <Badge variant="destructive" className="flex-shrink-0">
+                      Banned
+                    </Badge>
+                  )}
+                  <Badge
+                    variant="secondary"
+                    className={`flex items-center whitespace-nowrap flex-shrink-0 ${getRoleColor(
+                      member.role
+                    )}`}
+                  >
+                    {getRoleIcon(member.role)}
+                    <span className="text-xs">{member.role || "member"}</span>
+                  </Badge>
 
-                    {isAdmin &&
-                      member.role !== "owner" &&
-                      teamId &&
-                      (member.role === "admin" ? (
-                        <DropdownMenuItem
-                          onClick={() => handleRoleChange(member.id, "member")}
-                          className="text-destructive"
+                  {/* Render check-in time if available and requested */}
+                  {showTime && (
+                    <div className="text-xs text-muted-foreground flex items-center whitespace-nowrap flex-shrink-0">
+                      <Clock className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Checked in</span>
+                      <span className="sm:hidden">✓</span>
+                    </div>
+                  )}
+
+                  {/* Admin actions */}
+                  {(isUserAdmin || isAdmin) && member.id !== userId && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 flex-shrink-0"
                         >
-                          <ShieldOff className="h-4 w-4 mr-2" />
-                          Remove Admin
-                        </DropdownMenuItem>
-                      ) : (
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => handleRoleChange(member.id, "admin")}
+                          onClick={() => handleCopyId(member.id)}
+                          className="cursor-pointer"
                         >
-                          <Shield className="h-4 w-4 mr-2" />
-                          Make Admin
+                          <Copy className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">Copy ID</span>
                         </DropdownMenuItem>
-                      ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        {member.role !== "owner" && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRoleChange(
+                                  member.id,
+                                  member.role === "admin" ? "member" : "admin"
+                                )
+                              }
+                              className="cursor-pointer"
+                            >
+                              {member.role === "admin" ? (
+                                <>
+                                  <ShieldOff className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Remove Admin</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Shield className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Make Admin</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                member.isBanned
+                                  ? handleUnbanUser(member.id)
+                                  : handleBanUser(member.id)
+                              }
+                              className="cursor-pointer"
+                            >
+                              {member.isBanned ? (
+                                <>
+                                  <LogOut className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Unban User</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Ban className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Ban User</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </div>
           ))}

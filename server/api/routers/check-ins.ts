@@ -1,223 +1,387 @@
 import { z } from "zod";
-import { router, publicProcedure } from "@/lib/trpc/server";
-import { protectedProcedure, withSupabase } from "../middleware";
+import { router, Context } from "@/lib/trpc/server";
+import { protectedProcedure } from "../middleware";
+import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/prisma";
+
+export const serverGetCheckIns = async (args: {
+  teamId: string;
+  date: string;
+}) => {
+  const checkIns = await prisma.checkIn.findMany({
+    where: {
+      teamId: args.teamId,
+      checkInDate: toISODateTime(args.date),
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          bans: true,
+          members: {
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                },
+              },
+              role: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      checkedInAt: "asc",
+    },
+  });
+
+  return checkIns.map((checkIn: CheckInWithUser) => ({
+    id: checkIn.id,
+    userId: checkIn.userId,
+    checkInDate: checkIn.checkInDate,
+    checkedInAt: checkIn.checkedInAt,
+    notes: checkIn.notes,
+    rating: checkIn.rating,
+    checkoutAt: checkIn.checkoutAt,
+    user: checkIn.user,
+    role: (checkIn as any).team.members.find(
+      (member: { user: { id: string }; role: string }) =>
+        member.user.id === checkIn.userId
+    )?.role,
+    isBanned: (checkIn as any).team.bans.some(
+      (ban: { userId: string }) => ban.userId === checkIn.userId
+    ),
+    memberId: (checkIn as any).team.members.find(
+      (member: { user: { id: string } }) => member.user.id === checkIn.userId
+    )?.id,
+  }));
+};
+
+export type serverGetCheckInsReturnType = Awaited<
+  ReturnType<typeof serverGetCheckIns>
+>[number];
+
+// Helper function to convert date string to ISO DateTime
+export function toISODateTime(dateStr: string) {
+  const date = new Date(dateStr);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
+// Define input schemas
+const getByTeamAndDateSchema = z.object({
+  teamId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const getHistorySchema = z.object({
+  teamId: z.string().uuid(),
+  limit: z.number().min(1).max(100).optional().default(30),
+});
+
+const getUserCheckInStatusSchema = z.object({
+  teamId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const checkInSchema = z.object({
+  teamId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+  notes: z.string().optional(),
+});
+
+const checkoutSchema = z.object({
+  checkInId: z.string().uuid(),
+  rating: z.number().min(1).max(5),
+  notes: z.string().optional(),
+});
+
+interface CheckInWithUser {
+  id: string;
+  userId: string;
+  checkInDate: Date;
+  checkedInAt: Date;
+  notes: string | null;
+  rating: number | null;
+  checkoutAt: Date | null;
+  user: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    avatarUrl: string | null;
+  };
+}
+
+export async function serverGetCheckInStatus({
+  ctx,
+  teamId,
+  date,
+}: {
+  ctx: Context;
+  teamId: string;
+  date: string;
+}) {
+  const userId = ctx.userId;
+  const checkInDate = toISODateTime(date).toISOString(); // yyyy-mm-dd
+  if (!userId || !teamId || !checkInDate) {
+    return {
+      checkedIn: false,
+      checkInDetails: null,
+    };
+  }
+  const checkIn = await prisma.checkIn.findUnique({
+    where: {
+      teamId_userId_checkInDate: {
+        teamId: teamId,
+        userId: userId,
+        checkInDate: checkInDate,
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+  return {
+    checkedIn: !!checkIn,
+    checkInDetails: checkIn
+      ? {
+          id: checkIn.id,
+          userId: checkIn.userId,
+          checkInDate: checkIn.checkInDate,
+          checkedInAt: checkIn.checkedInAt,
+          notes: checkIn.notes,
+          rating: checkIn.rating,
+          checkoutAt: checkIn.checkoutAt,
+          user: checkIn.user,
+        }
+      : null,
+  };
+}
 
 export const checkInsRouter = router({
   getByTeamAndDate: protectedProcedure
-    .input(
-      z.object({
-        teamId: z.string().uuid(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-      })
-    )
+    .input(getByTeamAndDateSchema)
     .query(async ({ ctx, input }) => {
       try {
         // First verify the user has access to this team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        const membership = await prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
 
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
         }
 
         // Get check-ins with user details
-        const { data, error } = await ctx.supabase
-          .from("check_ins")
-          .select(
-            `
-            id,
-            user_id,
-            check_in_date,
-            checked_in_at,
-            notes,
-            users:user_id (
-              id,
-              name,
-              email,
-              avatar_url
-            )
-          `
-          )
-          .eq("team_id", input.teamId)
-          .eq("check_in_date", input.date)
-          .order("checked_in_at");
 
-        if (error) throw error;
-
-        // Transform the data to a more usable format
-        const checkIns = data.map((checkIn: any) => ({
-          id: checkIn.id,
-          userId: checkIn.user_id,
-          checkInDate: checkIn.check_in_date,
-          checkedInAt: checkIn.checked_in_at,
-          notes: checkIn.notes,
-          user: checkIn.users,
-        }));
-
-        return checkIns || [];
+        return await serverGetCheckIns({
+          teamId: input.teamId,
+          date: input.date,
+        });
       } catch (error) {
         console.error("Error fetching check-ins:", error);
+        if (error instanceof TRPCError) throw error;
         return [];
       }
     }),
 
   getHistory: protectedProcedure
-    .input(
-      z.object({
-        teamId: z.string().uuid(),
-        limit: z.number().min(1).max(100).optional().default(30),
-      })
-    )
+    .input(getHistorySchema)
     .query(async ({ ctx, input }) => {
       try {
         // First verify the user has access to this team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        const membership = await prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
 
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
         }
 
         // Get daily check-in counts for the past X days
-        const { data, error } = await ctx.supabase.rpc(
-          "get_daily_check_in_counts",
-          {
-            team_id_param: input.teamId,
-            days_limit: input.limit,
-          }
-        );
+        const checkInCounts = await prisma.$queryRaw`
+          SELECT 
+            DATE(check_in_date)::text as check_in_date,
+            COUNT(*) as check_in_count
+          FROM check_ins
+          WHERE team_id = ${input.teamId}::uuid
+          GROUP BY DATE(check_in_date)
+          ORDER BY DATE(check_in_date) DESC
+          LIMIT ${input.limit}
+        `;
 
-        if (error) {
-          // If the RPC function doesn't exist, fall back to a regular query
-          const { data: fallbackData, error: fallbackError } =
-            await ctx.supabase
-              .from("check_ins")
-              .select("check_in_date, count:id")
-              .eq("team_id", input.teamId)
-              .group("check_in_date")
-              .order("check_in_date", { ascending: false })
-              .limit(input.limit);
-
-          if (fallbackError) throw fallbackError;
-          return (
-            fallbackData?.map(
-              (row: { check_in_date: string; count: number }) => ({
-                check_in_date: row.check_in_date,
-                check_in_count: Number(row.count),
-              })
-            ) || []
-          );
-        }
-
-        return data || [];
+        return checkInCounts;
       } catch (error) {
         console.error("Error fetching check-in history:", error);
+        if (error instanceof TRPCError) throw error;
         return [];
       }
     }),
 
   getUserCheckInStatus: protectedProcedure
-    .input(
-      z.object({
-        teamId: z.string().uuid(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-      })
-    )
+    .input(getUserCheckInStatusSchema)
     .query(async ({ ctx, input }) => {
       try {
-        const { data, error } = await ctx.supabase
-          .from("check_ins")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .eq("check_in_date", input.date)
-          .single();
+        // First verify the user has access to this team
+        const membership = await prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
 
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 is "no rows returned"
-          throw error;
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
         }
 
-        return {
-          checkedIn: !!data,
-          checkInDetails: data || null,
-        };
+        // Check if the user has checked in for the day
+        return await serverGetCheckInStatus({
+          ctx,
+          teamId: input.teamId,
+          date: input.date,
+        });
       } catch (error) {
-        console.error("Error fetching user check-in status:", error);
+        console.error("Error fetching check-in status:", error);
+        if (error instanceof TRPCError) throw error;
         return { checkedIn: false, checkInDetails: null };
       }
     }),
 
   checkIn: protectedProcedure
-    .input(
-      z.object({
-        teamId: z.string().uuid(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-        notes: z.string().optional(),
-      })
-    )
+    .input(checkInSchema)
     .mutation(async ({ ctx, input }) => {
       try {
         // First verify the user has access to this team
-        const { data: membership, error: membershipError } = await ctx.supabase
-          .from("team_members")
-          .select("*")
-          .eq("team_id", input.teamId)
-          .eq("user_id", ctx.userId)
-          .single();
+        const membership = await prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
 
-        if (membershipError || !membership) {
-          throw new Error("You don't have access to this team");
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
         }
 
-        // Check if the user already checked in today
-        const { data: existingCheckIn, error: checkInError } =
-          await ctx.supabase
-            .from("check_ins")
-            .select("id")
-            .eq("team_id", input.teamId)
-            .eq("user_id", ctx.userId)
-            .eq("check_in_date", input.date)
-            .single();
-
-        if (existingCheckIn) {
-          return {
-            success: true,
-            message: "Already checked in",
-            alreadyCheckedIn: true,
-          };
-        }
-
-        // Create the check-in record
-        const { data, error } = await ctx.supabase
-          .from("check_ins")
-          .insert({
-            team_id: input.teamId,
-            user_id: ctx.userId,
-            check_in_date: input.date,
-            notes: input.notes || null,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
+        // Create the check-in
+        const date = toISODateTime(input.date);
+        const checkIn = await prisma.checkIn.create({
+          data: {
+            teamId: input.teamId,
+            userId: ctx.userId!,
+            checkInDate: date,
+            notes: input.notes,
+          },
+        });
 
         return {
           success: true,
           message: "Successfully checked in",
-          alreadyCheckedIn: false,
-          checkIn: data,
+          checkIn,
         };
       } catch (error) {
         console.error("Error checking in:", error);
+        throw error;
+      }
+    }),
+
+  checkout: protectedProcedure
+    .input(checkoutSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Get the check-in
+        const checkIn = await prisma.checkIn.findUnique({
+          where: { id: input.checkInId },
+          include: { team: true },
+        });
+
+        if (!checkIn) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Check-in not found",
+          });
+        }
+
+        // Verify user owns this check-in
+        if (checkIn.userId !== ctx.userId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only checkout your own check-in",
+          });
+        }
+
+        // Verify user hasn't already checked out
+        if (checkIn.checkoutAt) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You have already checked out for today",
+          });
+        }
+
+        // Update the check-in with checkout information
+        const updatedCheckIn = await prisma.checkIn.update({
+          where: { id: input.checkInId },
+          data: {
+            rating: input.rating,
+            notes: input.notes,
+            checkoutAt: new Date(),
+          },
+        });
+
+        return {
+          success: true,
+          message: "Successfully checked out",
+          checkIn: updatedCheckIn,
+        };
+      } catch (error) {
+        console.error("Error checking out:", error);
         throw error;
       }
     }),

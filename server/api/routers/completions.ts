@@ -1,166 +1,280 @@
 import { z } from "zod";
 import { router } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
+import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/prisma";
+import type { Context } from "@/lib/trpc/server";
+import { serverGetTeamMembers } from "./users";
+import { toISODateTime } from "./check-ins";
+
+// Define input schemas
+const getByDateSchema = z.object({
+  taskId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const getAllByDateSchema = z.object({
+  teamId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const toggleSchema = z.object({
+  userId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+  completed: z.boolean(),
+});
+
+type GetByDateInput = z.infer<typeof getByDateSchema>;
+type GetAllByDateInput = z.infer<typeof getAllByDateSchema>;
+type ToggleInput = z.infer<typeof toggleSchema>;
 
 export const completionsRouter = router({
   getByDate: protectedProcedure
-    .input(
-      z.object({
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-      })
-    )
-    .query(async ({ ctx, input }) => {
+    .input(getByDateSchema)
+    .query(async ({ ctx, input }: { ctx: Context; input: GetByDateInput }) => {
       try {
-        const { data: completions, error } = await ctx.supabase
-          .from("completions")
-          .select("*")
-          .eq("completed_date", input.date);
+        // First verify the user has access to this task
+        const task = await prisma.task.findFirst({
+          where: {
+            id: input.taskId,
+            isDeleted: false,
+          },
+          include: {
+            team: {
+              include: {
+                members: {
+                  where: {
+                    userId: ctx.userId!,
+                  },
+                },
+              },
+            },
+          },
+        });
 
-        if (error) throw error;
-        return completions || [];
+        if (!task) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
+        }
+
+        if (!task.team?.members.length) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this task",
+          });
+        }
+
+        // Get completion status
+        const completion = await prisma.taskCompletion.findFirst({
+          where: {
+            taskId: input.taskId,
+            completionDate: toISODateTime(input.date),
+            task: {
+              team: {
+                id: task.team.id,
+              },
+            },
+          },
+        });
+
+        return {
+          completed: !!completion,
+          completionDetails: completion,
+        };
       } catch (error) {
-        console.error("Error fetching completions:", error);
-        return [];
+        console.error("Error fetching completion status:", error);
+        if (error instanceof TRPCError) throw error;
+        return { completed: false, completionDetails: null };
       }
     }),
 
+  getAllByDate: protectedProcedure
+    .input(getAllByDateSchema)
+    .query(
+      async ({ ctx, input }: { ctx: Context; input: GetAllByDateInput }) => {
+        try {
+          const { teamId, date } = input;
+          if (!teamId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Team ID is required",
+            });
+          }
+
+          if (!ctx.userId) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "You must be logged in to view completions",
+            });
+          }
+
+          const teamMembers = await serverGetTeamMembers({
+            ctx,
+            teamId,
+            userId: ctx.userId,
+          });
+
+          // Get all completions for the user on the specified date
+          const completions = await ctx.prisma.taskCompletion.findMany({
+            where: {
+              completionDate: toISODateTime(input.date),
+              task: {
+                team: {
+                  members: {
+                    some: {
+                      userId: ctx.userId,
+                    },
+                  },
+                },
+                isDeleted: false,
+              },
+            },
+            include: {
+              task: {
+                include: {
+                  team: {
+                    include: {
+                      members: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              user: true,
+            },
+          });
+
+          return { teamMembers, completions };
+        } catch (error) {
+          console.error("Error fetching completions:", error);
+          if (error instanceof TRPCError) throw error;
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to fetch completions",
+          });
+        }
+      }
+    ),
+
   toggle: protectedProcedure
-    .input(
-      z.object({
-        taskId: z.string().uuid(),
-        userId: z.string().uuid(),
-        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-        completed: z.boolean(),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
+    .input(toggleSchema)
+    .mutation(async ({ ctx, input }: { ctx: Context; input: ToggleInput }) => {
       try {
-        const { data: task, error: taskError } = await ctx.supabase
-          .from("tasks")
-          .select("*")
-          .eq("id", input.taskId)
-          .single();
+        if (!ctx.userId) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "You must be logged in to complete tasks",
+          });
+        }
 
-        if (taskError) throw taskError;
+        // First verify the user has access to this task
+        const task = await prisma.task.findFirst({
+          where: {
+            id: input.taskId,
+            isDeleted: false,
+          },
+          include: {
+            team: {
+              include: {
+                members: {
+                  where: {
+                    userId: ctx.userId,
+                  },
+                },
+              },
+            },
+          },
+        });
 
-        if (input.completed) {
-          // Check if this is a parent task
-          const { data: childTasks, error: childTasksError } = await ctx.supabase
-            .from("tasks")
-            .select("id")
-            .eq("parent_id", input.taskId);
+        if (!task) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Task not found",
+          });
+        }
 
-          if (childTasksError) throw childTasksError;
+        if (!task.team?.members || task.team.members.length === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this task",
+          });
+        }
 
-          if (childTasks && childTasks.length > 0) {
-            // For a parent task, we need to make sure all child tasks are completed
-            const childTaskIds = childTasks.map((child: { id: string }) => child.id);
-            
-            const { data: childCompletions, error: childCompletionsError } = await ctx.supabase
-              .from("completions")
-              .select("task_id")
-              .in("task_id", childTaskIds)
-              .eq("completed_date", input.date);
+        // Check if the user has checked in for the day
+        // const checkIn = await prisma.checkIn.findFirst({
+        //   where: {
+        //     teamId: task.team.id,
+        //     userId: ctx.userId,
+        //     checkInDate: {
+        //       equals: input.date,
+        //     },
+        //   },
+        // });
 
-            if (childCompletionsError) throw childCompletionsError;
-            
-            const completedChildTaskIds = childCompletions?.map((c: { task_id: string }) => c.task_id) || [];
-            const allChildrenComplete = childTaskIds.every((id: string) => completedChildTaskIds.includes(id));
-            
-            if (!allChildrenComplete) {
-              throw new Error("Cannot complete parent task - not all subtasks are complete");
-            }
-          }
-          
-          // Get all users from the database
-          const { data: users, error: usersError } = await ctx.supabase
-            .from("users")
-            .select("id");
+        // if (!checkIn) {
+        //   throw new TRPCError({
+        //     code: "BAD_REQUEST",
+        //     message: "You must check in before completing tasks",
+        //   });
+        // }
 
-          if (usersError) throw usersError;
+        // Get existing completion
+        const existingCompletion = await prisma.taskCompletion.findFirst({
+          where: {
+            taskId: input.taskId,
+            completionDate: toISODateTime(input.date),
+            task: {
+              team: {
+                id: task.team.id,
+              },
+            },
+          },
+        });
 
-          // Add completion for all users, marking the original user as the completer
-          const completions = (users || []).map((user: { id: string }) => ({
-            task_id: input.taskId,
-            user_id: user.id,
-            completed_date: input.date,
-            completed_by: input.userId, // Track who completed it
-          }));
+        if (existingCompletion) {
+          // Delete the completion
+          await prisma.taskCompletion.delete({
+            where: {
+              id: existingCompletion.id,
+            },
+          });
 
-          const { data, error } = await ctx.supabase
-            .from("completions")
-            .insert(completions)
-            .select();
-
-          if (error && error.code !== "23505") throw error; // Ignore unique violation errors
-          
-          // If this is a subtask, check if all siblings are now complete to possibly complete the parent
-          if (task.parent_id) {
-            // Get all sibling tasks (tasks with the same parent)
-            const { data: siblingTasks, error: siblingTasksError } = await ctx.supabase
-              .from("tasks")
-              .select("id")
-              .eq("parent_id", task.parent_id);
-              
-            if (siblingTasksError) throw siblingTasksError;
-            
-            if (siblingTasks && siblingTasks.length > 0) {
-              const siblingTaskIds = siblingTasks.map((sibling: { id: string }) => sibling.id);
-              
-              // Get completions for all siblings
-              const { data: siblingCompletions, error: siblingCompletionsError } = await ctx.supabase
-                .from("completions")
-                .select("task_id")
-                .in("task_id", siblingTaskIds)
-                .eq("completed_date", input.date);
-                
-              if (siblingCompletionsError) throw siblingCompletionsError;
-              
-              const completedSiblingTaskIds = siblingCompletions?.map((c: { task_id: string }) => c.task_id) || [];
-              const allSiblingsComplete = siblingTaskIds.every((id: string) => completedSiblingTaskIds.includes(id));
-              
-              // If all siblings are complete, mark parent as complete too
-              if (allSiblingsComplete) {
-                // Get all users again for parent task completion
-                const userCompletions = (users || []).map((user: { id: string }) => ({
-                  task_id: task.parent_id,
-                  user_id: user.id,
-                  completed_date: input.date,
-                  completed_by: input.userId, // Same user completes the parent
-                }));
-                
-                await ctx.supabase
-                  .from("completions")
-                  .insert(userCompletions);
-              }
-            }
-          }
-          
-          return data;
+          return {
+            success: true,
+            message: "Task marked as incomplete for the team",
+            completed: false,
+          };
         } else {
-          // Remove completion for all users
-          const { error } = await ctx.supabase
-            .from("completions")
-            .delete()
-            .eq("task_id", input.taskId)
-            .eq("completed_date", input.date);
+          // Create the completion
+          const date = toISODateTime(input.date);
+          const completion = await prisma.taskCompletion.create({
+            data: {
+              taskId: input.taskId,
+              userId: ctx.userId,
+              completionDate: date,
+            },
+          });
 
-          if (error) throw error;
-          
-          // If a child task is being unchecked, also uncheck the parent
-          if (task.parent_id) {
-            await ctx.supabase
-              .from("completions")
-              .delete()
-              .eq("task_id", task.parent_id)
-              .eq("completed_date", input.date);
-          }
-          
-          return null;
+          return {
+            success: true,
+            message: "Task marked as complete for the team",
+            completed: true,
+            completion,
+          };
         }
       } catch (error) {
         console.error("Error toggling completion:", error);
-        throw error;
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to toggle task completion",
+        });
       }
     }),
 });

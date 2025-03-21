@@ -1,8 +1,10 @@
 export interface Task {
-  id: string
-  title: string
-  parent_id: string | null
-  position: number
-  team_id: string | null
-  created_at: string
-} 
+  id: string;
+  title: string;
+  parentId: string | null;
+  position: number;
+  teamId: string | null;
+  isDeleted: boolean;
+  createdAt: Date | null;
+  assignments: { userId: string }[];
+}
