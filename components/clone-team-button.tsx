@@ -149,7 +149,12 @@ export function CloneTeamButton({
   };
 
   if (!isCloneable) {
-    return null;
+    return (
+      <Button variant="outline" className="w-full" disabled>
+        <Copy className="mr-2 h-4 w-4" />
+        Cloning Disabled
+      </Button>
+    );
   }
 
   return (
