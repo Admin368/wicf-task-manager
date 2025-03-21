@@ -686,7 +686,7 @@ export const teamsRouter = router({
           where: { slug },
         });
 
-        // If slug exists, append a random number
+        // If slug exists, throw an error
         if (existingTeam) {
           const existingNameError = `A team with the name "${input.newTeamName}" already exists. Please choose a different name.`;
           throw new TRPCError({
@@ -698,90 +698,101 @@ export const teamsRouter = router({
         // Hash the password
         const hashedPassword = await hashPassword(input.newTeamPassword);
 
-        // Step 1: Create the new team and add current user as admin (not in transaction)
-        const team = await ctx.prisma.team.create({
-          data: {
-            name: input.newTeamName,
-            slug,
-            password: hashedPassword,
-            isPrivate: input.isPrivate ?? false,
-            isCloneable: false, // Default to not cloneable for cloned teams
-          },
-        });
-
-        // Step 2: Add current user as admin
-        await ctx.prisma.teamMember.create({
-          data: {
-            teamId: team.id,
-            userId,
-            role: "admin",
-          },
-        });
-
-        // Step 3: Get all top-level tasks from the source team
-        const topLevelTasks = await ctx.prisma.task.findMany({
-          where: {
-            teamId: input.teamId,
-            isDeleted: false,
-            parentId: null,
-          },
-          orderBy: {
-            position: "asc",
-          },
-        });
-
-        // Map to track original task ID to new task ID
-        const taskIdMap = new Map();
-
-        // Step 4: Clone top-level tasks (without transaction)
-        for (const task of topLevelTasks) {
-          const newTask = await ctx.prisma.task.create({
-            data: {
-              title: task.title,
-              position: task.position,
-              teamId: team.id,
-            },
-          });
-          taskIdMap.set(task.id, newTask.id);
-        }
-
-        // Step 5: Get and clone child tasks level by level
-        const processedParentIds = Array.from(taskIdMap.keys());
-
-        while (processedParentIds.length > 0) {
-          const parentId = processedParentIds.shift();
-          if (!parentId) continue;
-
-          // Find children of this parent
-          const childTasks = await ctx.prisma.task.findMany({
-            where: {
-              parentId,
-              isDeleted: false,
-              teamId: input.teamId,
-            },
-            orderBy: {
-              position: "asc",
-            },
-          });
-
-          // Clone each child task individually
-          for (const childTask of childTasks) {
-            const newTask = await ctx.prisma.task.create({
+        // Use a transaction for all database operations to ensure atomicity
+        return await ctx.prisma.$transaction(
+          async (tx) => {
+            // Step 1: Create the new team
+            const team = await tx.team.create({
               data: {
-                title: childTask.title,
-                position: childTask.position,
-                teamId: team.id,
-                parentId: taskIdMap.get(childTask.parentId!),
+                name: input.newTeamName,
+                slug,
+                password: hashedPassword,
+                isPrivate: input.isPrivate ?? false,
+                isCloneable: false, // Default to not cloneable for cloned teams
               },
             });
 
-            // Add this task's ID to the map and queue
-            taskIdMap.set(childTask.id, newTask.id);
-            processedParentIds.push(childTask.id);
-          }
-        }
+            // Step 2: Add current user as admin
+            await tx.teamMember.create({
+              data: {
+                teamId: team.id,
+                userId,
+                role: "admin",
+              },
+            });
 
-        return team;
+            // Step 3: Get all tasks from the source team, organized by levels
+            const allTasks = await tx.task.findMany({
+              where: {
+                teamId: input.teamId,
+                isDeleted: false,
+              },
+              orderBy: [{ parentId: "asc" }, { position: "asc" }],
+            });
+
+            // Map to track original task ID to new task ID
+            const taskIdMap = new Map();
+
+            // Step 4: First process top-level tasks (parentId is null)
+            const topLevelTasks = allTasks.filter(
+              (task) => task.parentId === null
+            );
+
+            for (const task of topLevelTasks) {
+              const newTask = await tx.task.create({
+                data: {
+                  title: task.title,
+                  position: task.position,
+                  teamId: team.id,
+                },
+              });
+              taskIdMap.set(task.id, newTask.id);
+            }
+
+            // Step 5: Process child tasks level by level to maintain parent-child relationships
+            // Group tasks by parentId for faster lookup
+            const tasksByParentId = allTasks
+              .filter((task) => task.parentId !== null)
+              .reduce((acc, task) => {
+                if (!acc.has(task.parentId!)) {
+                  acc.set(task.parentId!, []);
+                }
+                acc.get(task.parentId!).push(task);
+                return acc;
+              }, new Map());
+
+            // Process levels in order
+            const processedParentIds = Array.from(taskIdMap.keys());
+
+            while (processedParentIds.length > 0) {
+              const parentId = processedParentIds.shift();
+              if (!parentId) continue;
+
+              const childTasks = tasksByParentId.get(parentId) || [];
+
+              // Create child tasks for this parent
+              for (const childTask of childTasks) {
+                const newTask = await tx.task.create({
+                  data: {
+                    title: childTask.title,
+                    position: childTask.position,
+                    teamId: team.id,
+                    parentId: taskIdMap.get(childTask.parentId!),
+                  },
+                });
+
+                taskIdMap.set(childTask.id, newTask.id);
+                processedParentIds.push(childTask.id);
+              }
+            }
+
+            return team;
+          },
+          {
+            // Set a longer timeout for large teams with many tasks
+            timeout: 30000, // 30 seconds
+          }
+        );
       } catch (error) {
         console.error("Error cloning team:", error);
         if (error instanceof TRPCError) throw error;
