@@ -144,43 +144,45 @@ export default function CheckInsPage() {
   }
 
   return (
-    <div className="container py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold">Daily Check-ins</h1>
+    <div className="container px-2 sm:px-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold">Daily Check-ins</h1>
         <Button
           variant="outline"
           onClick={() => router.push(`/team/${slug}/check-ins/history`)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 w-full sm:w-auto"
         >
           <Calendar className="h-4 w-4" />
-          View History
+          <span>View History</span>
         </Button>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 mt-4">
         {/* <CheckInButton teamId={team.id} /> */}
         {/* <CheckInStatusBar teamId={team.id} totalMembers={totalMembers} /> */}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 px-3 py-3 sm:px-6 sm:py-4">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
               <span>Select Date</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="w-full p-2 sm:p-6">
             <DatePicker date={selectedDate} onDateChange={setSelectedDate} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              <span>Check-ins for {format(selectedDate, "MMMM d, yyyy")}</span>
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 px-3 py-3 sm:px-6 sm:py-4">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="truncate">
+                Check-ins for {format(selectedDate, "MMM d, yyyy")}
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-1 py-1 sm:px-6 sm:py-3">
             {checkInsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -193,10 +195,12 @@ export default function CheckInsPage() {
                 teamId={team.id}
               />
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                <Calendar className="h-12 w-12 mb-4 text-muted-foreground/50" />
-                <h3 className="text-lg font-medium mb-1">No Check-ins</h3>
-                <p className="max-w-sm mb-6">
+              <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center text-muted-foreground">
+                <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mb-3 sm:mb-4 text-muted-foreground/50" />
+                <h3 className="text-base sm:text-lg font-medium mb-1">
+                  No Check-ins
+                </h3>
+                <p className="max-w-sm mb-4 sm:mb-6 text-sm sm:text-base">
                   No team members have checked in for this date yet.
                 </p>
 

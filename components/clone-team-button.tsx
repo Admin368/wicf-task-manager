@@ -88,7 +88,7 @@ export function CloneTeamButton({
       <DialogTrigger asChild>
         <Button variant="outline" className="w-full">
           <Copy className="mr-2 h-4 w-4" />
-          Clone Team
+          Make own copy of this team
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">

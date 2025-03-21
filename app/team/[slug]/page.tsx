@@ -280,33 +280,33 @@ export default function TeamPage() {
         {/* Main content area */}
         <div className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full max-w-md mx-auto mb-8">
+            <TabsList className="w-full max-w-md mx-auto mb-4 sm:mb-8 overflow-hidden">
               <TabsTrigger
                 value="tasks"
                 onClick={() => setActiveTab("tasks")}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
               >
                 Tasks
               </TabsTrigger>
               <TabsTrigger
                 value="members"
                 onClick={() => setActiveTab("members")}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
               >
-                Team Members
+                <span className="hidden sm:inline">Team </span>Members
               </TabsTrigger>
               <TabsTrigger
                 value="check-ins"
                 onClick={() => setActiveTab("check-ins")}
-                className="flex-1"
+                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
               >
                 Check-ins
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="tasks" className="space-y-6">
+            <TabsContent value="tasks" className="mt-0">
               <div className="flex flex-col">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                   <DatePicker
                     date={selectedDate}
                     onDateChange={setSelectedDate}
@@ -325,8 +325,8 @@ export default function TeamPage() {
                 </div>
 
                 <div className="mt-4">
-                  <h2 className="text-lg font-semibold mb-4">
-                    Tasks for {format(selectedDate, "MMMM d, yyyy")}
+                  <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4">
+                    Tasks for {format(selectedDate, "MMM d, yyyy")}
                   </h2>
 
                   <TaskList
@@ -338,7 +338,10 @@ export default function TeamPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="members" className="space-y-6">
+            <TabsContent
+              value="members"
+              className="space-y-4 sm:space-y-6 mt-0"
+            >
               <UserList
                 teamId={team?.id || ""}
                 teamMembers={teamMembers || []}
@@ -346,10 +349,11 @@ export default function TeamPage() {
               />
             </TabsContent>
 
-            <TabsContent value="check-ins" className="space-y-6">
-              <CheckInsPage
-              // teamId={teamData?.team?.id}
-              />
+            <TabsContent
+              value="check-ins"
+              className="space-y-4 sm:space-y-6 mt-0 px-0 sm:px-4"
+            >
+              <CheckInsPage />
             </TabsContent>
           </Tabs>
         </div>

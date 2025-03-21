@@ -192,132 +192,170 @@ export function UserListCheckIns({
           {checkIns.map((checkIn) => (
             <div
               key={checkIn.id}
-              className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group"
+              className="p-3 rounded-md hover:bg-muted group"
             >
-              <Avatar>
-                {checkIn.user.avatarUrl ? (
-                  <img
-                    src={checkIn.user.avatarUrl}
-                    alt={checkIn.user.name ?? "User Avatar"}
-                  />
-                ) : (
-                  <AvatarFallback>
-                    {checkIn.user.name
-                      ? checkIn.user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                      : "?"}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex-1">
-                <div className="font-medium">
-                  {checkIn.user.name}
-                  {checkIn.userId === userId && (
-                    <Badge variant="outline" className="ml-2 text-xs">
-                      Me
-                    </Badge>
+              <div className="flex flex-wrap gap-3">
+                {/* Avatar and name - always on first line */}
+                <div className="flex items-center gap-2 flex-grow min-w-0 mb-1">
+                  <Avatar className="flex-shrink-0">
+                    {checkIn.user.avatarUrl ? (
+                      <img
+                        src={checkIn.user.avatarUrl}
+                        alt={checkIn.user.name ?? "User Avatar"}
+                      />
+                    ) : (
+                      <AvatarFallback>
+                        {checkIn.user.name
+                          ? checkIn.user.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                          : "?"}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">
+                      {checkIn.user.name}
+                      {checkIn.userId === userId && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          Me
+                        </Badge>
+                      )}
+                    </div>
+                    {checkIn.user.email && (
+                      <div className="text-sm text-muted-foreground truncate">
+                        {checkIn.user.email}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Check-in details section */}
+                <div className="w-full flex flex-col gap-1">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {showTime && checkIn.checkedInAt && (
+                      <div className="text-xs text-muted-foreground flex items-center whitespace-nowrap flex-shrink-0">
+                        <Clock className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">Checked in at </span>
+                        <span>
+                          {format(new Date(checkIn.checkedInAt), "h:mm a")}
+                        </span>
+                      </div>
+                    )}
+                    {checkIn.checkoutAt && (
+                      <div className="text-xs text-muted-foreground flex items-center whitespace-nowrap flex-shrink-0">
+                        <LogOut className="h-3 w-3 mr-1" />
+                        <span className="hidden sm:inline">
+                          Checked out at{" "}
+                        </span>
+                        <span>
+                          {format(new Date(checkIn.checkoutAt), "h:mm a")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {checkIn.rating && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <StarRating rating={checkIn.rating} />
+                    </div>
+                  )}
+
+                  {checkIn.notes && (
+                    <div className="text-xs text-muted-foreground mt-1 break-words">
+                      {checkIn.notes}
+                    </div>
                   )}
                 </div>
-                {checkIn.user.email && (
-                  <div className="text-sm text-muted-foreground">
-                    {checkIn.user.email}
-                  </div>
-                )}
-                {showTime && checkIn.checkedInAt && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Checked in at{" "}
-                    {format(new Date(checkIn.checkedInAt), "h:mm a")}
-                  </div>
-                )}
-                {checkIn.checkoutAt && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <LogOut className="h-3 w-3" />
-                    Checked out at{" "}
-                    {format(new Date(checkIn.checkoutAt), "h:mm a")}
-                  </div>
-                )}
-                {checkIn.rating && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <StarRating rating={checkIn.rating} />
-                  </div>
-                )}
-                {checkIn.notes && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {checkIn.notes}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {/* {checkIn.isBanned && (
-                  <Badge variant="destructive">
-                    Banned
+
+                {/* Role badge and actions - on bottom line */}
+                <div className="flex items-center gap-2 flex-wrap w-full md:w-auto md:ml-auto mt-2">
+                  {checkIn.isBanned && (
+                    <Badge variant="destructive" className="flex-shrink-0">
+                      Banned
+                    </Badge>
+                  )}
+                  <Badge
+                    variant="secondary"
+                    className={`flex items-center whitespace-nowrap flex-shrink-0 ${getRoleColor(
+                      checkIn.role
+                    )}`}
+                  >
+                    {getRoleIcon(checkIn.role)}
+                    <span className="text-xs">{checkIn.role || "member"}</span>
                   </Badge>
-                )} */}
-                <Badge
-                  variant="secondary"
-                  className={`flex items-center ${getRoleColor(checkIn.role)}`}
-                >
-                  {getRoleIcon(checkIn.role)}
-                  {checkIn.role || "Member"}
-                </Badge>
-                {isAdmin && checkIn.userId !== userId && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleCopyId(checkIn.memberId)}
-                        className="cursor-pointer"
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy ID
-                      </DropdownMenuItem>
-                      {checkIn.role !== "owner" && (
-                        <>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              handleRoleChange(
-                                checkIn.memberId,
-                                checkIn.role === "admin" ? "member" : "admin"
-                              )
-                            }
-                            className="cursor-pointer"
-                          >
-                            {checkIn.role === "admin" ? (
-                              <>
-                                <ShieldOff className="h-4 w-4 mr-2" />
-                                Remove Admin
-                              </>
-                            ) : (
-                              <>
-                                <Shield className="h-4 w-4 mr-2" />
-                                Make Admin
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              checkIn.isBanned
-                                ? handleUnbanUser(checkIn.memberId)
-                                : handleBanUser(checkIn.memberId)
-                            }
-                            className="cursor-pointer"
-                          >
-                            <Ban className="h-4 w-4 mr-2" />
-                            {checkIn.isBanned ? "Unban User" : "Ban User"}
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+
+                  {isAdmin && checkIn.userId !== userId && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 flex-shrink-0"
+                        >
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleCopyId(checkIn.memberId)}
+                          className="cursor-pointer"
+                        >
+                          <Copy className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">Copy ID</span>
+                        </DropdownMenuItem>
+                        {checkIn.role !== "owner" && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleRoleChange(
+                                  checkIn.memberId,
+                                  checkIn.role === "admin" ? "member" : "admin"
+                                )
+                              }
+                              className="cursor-pointer"
+                            >
+                              {checkIn.role === "admin" ? (
+                                <>
+                                  <ShieldOff className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Remove Admin</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Shield className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Make Admin</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                checkIn.isBanned
+                                  ? handleUnbanUser(checkIn.memberId)
+                                  : handleBanUser(checkIn.memberId)
+                              }
+                              className="cursor-pointer"
+                            >
+                              {checkIn.isBanned ? (
+                                <>
+                                  <LogOut className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Unban User</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Ban className="h-4 w-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Ban User</span>
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
               </div>
             </div>
           ))}
