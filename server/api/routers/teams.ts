@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 type TeamInput = {
   name: string;
   password: string;
+  isPrivate?: boolean;
 };
 
 type JoinInput = {
@@ -35,6 +36,7 @@ export const teamsRouter = router({
           name: true,
           slug: true,
           createdAt: true,
+          isPrivate: true,
           members: {
             select: {
               userId: true,
@@ -86,6 +88,7 @@ export const teamsRouter = router({
           name: true,
           slug: true,
           createdAt: true,
+          isPrivate: true,
           members: {
             select: {
               userId: true,
@@ -141,9 +144,54 @@ export const teamsRouter = router({
           userId: ctx.userId,
           checkIfMember: true,
         });
-        return { team, teamMembers };
+        return {
+          team: {
+            ...team,
+            password: undefined,
+          },
+          teamMembers,
+        };
       } catch (error) {
         console.error("Error fetching team:", error);
+        throw error;
+      }
+    }),
+
+  getBySlugPublic: protectedProcedure
+    .input(
+      z.object({
+        slug: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const team = await ctx.prisma.team.findFirst({
+          where: {
+            slug: input.slug,
+            isDeleted: false,
+          },
+        });
+        if (!team) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
+
+        // Check if the user is already a member
+        const existingMembership = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: team.id,
+            userId: ctx.userId,
+          },
+        });
+
+        return {
+          team,
+          isMember: !!existingMembership,
+        };
+      } catch (error) {
+        console.error("Error fetching team for join page:", error);
         throw error;
       }
     }),
@@ -153,6 +201,7 @@ export const teamsRouter = router({
       z.object({
         name: z.string().min(1),
         password: z.string().min(4),
+        isPrivate: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }: { ctx: Context; input: TeamInput }) => {
@@ -183,6 +232,7 @@ export const teamsRouter = router({
               name: input.name,
               slug,
               password: hashedPassword,
+              isPrivate: input.isPrivate || false,
             },
           });
 
@@ -325,7 +375,7 @@ export const teamsRouter = router({
         teamId: z.string().uuid(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }: { ctx: Context; input: TeamIdInput }) => {
       try {
         if (!ctx.userId) throw new Error("User ID is required");
         const userId = ctx.userId;
@@ -424,6 +474,146 @@ export const teamsRouter = router({
         },
       });
       return member;
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        name: z.string().min(1).optional(),
+        isPrivate: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        if (!ctx.userId) throw new Error("User ID is required");
+
+        // Check if user is admin
+        const isAdmin = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+            role: "admin",
+          },
+        });
+
+        if (!isAdmin) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only team admins can update team settings",
+          });
+        }
+
+        // Generate new slug if name changes
+        let updateData: any = {};
+
+        if (input.name) {
+          let slug = slugify(input.name);
+
+          // Check if slug already exists (excluding current team)
+          const existingTeam = await ctx.prisma.team.findFirst({
+            where: {
+              slug,
+              id: { not: input.teamId },
+            },
+          });
+
+          // If slug exists, append a random number
+          if (existingTeam) {
+            slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
+          }
+
+          updateData.name = input.name;
+          updateData.slug = slug;
+        }
+
+        if (input.isPrivate !== undefined) {
+          updateData.isPrivate = input.isPrivate;
+        }
+
+        // Update team
+        const updatedTeam = await ctx.prisma.team.update({
+          where: { id: input.teamId },
+          data: updateData,
+        });
+
+        return updatedTeam;
+      } catch (error) {
+        console.error("Error updating team:", error);
+        throw error;
+      }
+    }),
+
+  updatePassword: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        currentPassword: z.string().min(1).optional(),
+        newPassword: z.string().min(4),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        if (!ctx.userId) throw new Error("User ID is required");
+
+        // Check if user is admin
+        const isAdmin = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+            role: "admin",
+          },
+        });
+
+        if (!isAdmin) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only team admins can update team password",
+          });
+        }
+
+        // Get current team
+        const team = await ctx.prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { password: true },
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
+
+        // Verify current password if provided
+        if (input.currentPassword) {
+          const isPasswordValid = await verifyPassword(
+            team.password,
+            input.currentPassword
+          );
+
+          if (!isPasswordValid) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "Current password is incorrect",
+            });
+          }
+        }
+
+        // Hash the new password
+        const hashedNewPassword = await hashPassword(input.newPassword);
+
+        // Update team with new password
+        await ctx.prisma.team.update({
+          where: { id: input.teamId },
+          data: { password: hashedNewPassword },
+        });
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error updating team password:", error);
+        throw error;
+      }
     }),
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,7 @@ export default function JoinTeamPage() {
     data: teamData,
     isLoading,
     error,
-  } = api.teams.getBySlug.useQuery(
+  } = api.teams.getBySlugPublic.useQuery(
     { slug },
     {
       onError: (error) => {
@@ -40,7 +40,18 @@ export default function JoinTeamPage() {
       },
     }
   );
-  const { team, teamMembers } = teamData || {};
+  const { team, isMember } = teamData || {};
+
+  // Redirect to team page if already a member
+  useEffect(() => {
+    if (isMember) {
+      toast({
+        title: "Already a member",
+        description: "You are already a member of this team.",
+      });
+      router.push(`/team/${slug}`);
+    }
+  }, [isMember, router, slug]);
 
   const joinTeam = api.teams.join.useMutation({
     onSuccess: () => {

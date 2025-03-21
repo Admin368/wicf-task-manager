@@ -58,13 +58,23 @@ export function UserRegisterForm({
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+
+        if (response.status === 400 && errorText === "User already exists") {
+          throw new Error("A user with this email already exists");
+        }
+
         throw new Error("Registration failed");
       }
 
       toast.success("Registration successful! Please sign in.");
       router.push("/login");
     } catch (error) {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

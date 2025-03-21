@@ -511,4 +511,122 @@ export const tasksRouter = router({
 
       return { success: true };
     }),
+
+  updateAssignments: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().uuid(),
+        userIds: z.array(z.string().uuid()),
+        action: z.enum(["add", "remove", "set"]).default("add"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { taskId, userIds, action } = input;
+
+      // Verify user has access to the task
+      const task = await ctx.prisma.task.findUnique({
+        where: { id: taskId },
+        include: {
+          team: true,
+          assignments: true,
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Task not found",
+        });
+      }
+
+      const teamId = task.teamId;
+      if (!teamId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found",
+        });
+      }
+
+      // Verify user is a member of the team
+      const teamMember = await ctx.prisma.teamMember.findUnique({
+        where: {
+          teamId_userId: {
+            teamId,
+            userId: ctx.userId,
+          },
+        },
+      });
+
+      if (!teamMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this task",
+        });
+      }
+
+      // Verify user is admin
+      if (teamMember.role !== "admin" && teamMember.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can manage task assignments",
+        });
+      }
+
+      // Get current assignments
+      const currentAssignments = task.assignments.map((a) => a.userId);
+
+      try {
+        // Handle different actions
+        if (action === "set") {
+          // Remove all existing assignments
+          await ctx.prisma.taskAssignment.deleteMany({
+            where: { taskId },
+          });
+
+          // Add all specified assignments
+          if (userIds.length > 0) {
+            await ctx.prisma.taskAssignment.createMany({
+              data: userIds.map((userId) => ({
+                taskId,
+                userId,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        } else if (action === "add") {
+          // Add new assignments
+          if (userIds.length > 0) {
+            await ctx.prisma.taskAssignment.createMany({
+              data: userIds.map((userId) => ({
+                taskId,
+                userId,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        } else if (action === "remove") {
+          // Remove specified assignments
+          if (userIds.length > 0) {
+            await ctx.prisma.$transaction(
+              userIds.map((userId) =>
+                ctx.prisma.taskAssignment.deleteMany({
+                  where: {
+                    taskId,
+                    userId,
+                  },
+                })
+              )
+            );
+          }
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error("Error updating task assignments:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update task assignments",
+        });
+      }
+    }),
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/router";
 import { format, parseISO, subDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,6 @@ import { api } from "@/lib/trpc/client";
 import { DatePicker } from "@/components/date-picker";
 // import { UserList } from "@/components/user-list";
 import { toast } from "@/components/ui/use-toast";
-import { CheckInButton } from "@/components/check-in-button";
-import { CheckInStatusBar } from "@/components/check-in-status-bar";
-import { cn } from "@/lib/utils";
 import { UserListCheckIns } from "@/components/user-list-checkins";
 
 interface HistoryItem {
@@ -41,9 +38,9 @@ interface CheckIn {
 }
 
 export default function CheckInsPage() {
-  const params = useParams();
   const router = useRouter();
-  const slug = params?.slug as string;
+  const query = router.query || undefined;
+  const slug = query?.slug as string;
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [teamLoaded, setTeamLoaded] = useState(false);
 
@@ -65,6 +62,9 @@ export default function CheckInsPage() {
     );
   const { team, teamMembers } = teamData || {};
 
+  // Use the team id from the data
+  const currentTeamId = team?.id || "";
+
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
@@ -83,21 +83,15 @@ export default function CheckInsPage() {
     }
   );
 
-  // Get team members
-  // const { data: teamMembers } = api.users.getTeamMembers.useQuery(
-  //   { teamId: team?.id || "" },
-  //   { enabled: !!team?.id && teamLoaded }
-  // );
-
   // Get check-ins for the selected date
   const { data: checkIns, isLoading: checkInsLoading } =
     api.checkIns.getByTeamAndDate.useQuery(
       {
-        teamId: team?.id || "",
+        teamId: currentTeamId,
         date: formattedDate,
       },
       {
-        enabled: !!team?.id && teamLoaded,
+        enabled: !!currentTeamId && teamLoaded,
         retry: false,
         onError: (error) => {
           toast({
@@ -113,11 +107,11 @@ export default function CheckInsPage() {
   const { data: history, isLoading: historyLoading } =
     api.checkIns.getHistory.useQuery(
       {
-        teamId: team?.id || "",
+        teamId: currentTeamId,
         limit: 30,
       },
       {
-        enabled: !!team?.id && teamLoaded,
+        enabled: !!currentTeamId && teamLoaded,
         retry: false,
         onError: (error) => {
           toast({

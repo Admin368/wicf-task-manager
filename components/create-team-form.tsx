@@ -17,12 +17,14 @@ import { api } from "@/lib/trpc/client";
 import { Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
+import { Switch } from "@/components/ui/switch";
 
 export function CreateTeamForm() {
   const router = useRouter();
   const { data: session } = useSession();
   const [teamName, setTeamName] = useState("");
   const [password, setPassword] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect to login if not authenticated
@@ -75,6 +77,7 @@ export function CreateTeamForm() {
       await createTeam.mutateAsync({
         name: teamName,
         password,
+        isPrivate,
       });
     } catch (error) {
       // Error is handled in the mutation
@@ -112,6 +115,22 @@ export function CreateTeamForm() {
             />
             <p className="text-xs text-muted-foreground">
               This password will be used by team members to join your team.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="private-mode"
+                checked={isPrivate}
+                onCheckedChange={setIsPrivate}
+              />
+              <Label htmlFor="private-mode">
+                Private Team (hidden from home page)
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {`Private teams won't be listed on the home page and can only be
+              joined with a direct invite link.`}
             </p>
           </div>
         </CardContent>

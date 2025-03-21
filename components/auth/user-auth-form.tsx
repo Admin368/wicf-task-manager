@@ -33,7 +33,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [authError, setAuthError] = React.useState<string>("");
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/account";
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);

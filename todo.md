@@ -1,6 +1,6 @@
 # Feature List
 
-- ## v1 - MVP no Auth {cm:2025-03-20} {c}
+- ## v1 - MVP no Auth {cm:2025-03-20}
 
   - Refresh on login {cm:2025-03-20}
   - full width for modbile {cm:2025-03-20}
@@ -52,3 +52,7 @@ Show assigned to me {cm:2025-03-21}
 #bug Completed not showing {cm:2025-03-21}
 
 Assignment per Day
+
+Improved UI for mobile on tasks {cm:2025-03-21}
+
+all toast to sonner {cm:2025-03-21}

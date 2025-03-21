@@ -30,7 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { api } from "@/lib/trpc/client";
 import { useSession } from "next-auth/react";
 import { StarRating } from "@/components/ui/star-rating";
@@ -51,10 +51,11 @@ import { serverGetTeamMembersReturnType } from "@/server/api/routers/users";
 
 interface UserListProps {
   teamMembers: serverGetTeamMembersReturnType[];
-  onClose: () => void;
+  onClose?: () => void;
   showTime?: boolean;
   teamId: string;
   refetch?: () => void;
+  isAdmin?: boolean;
 }
 
 export function UserList({
@@ -63,66 +64,57 @@ export function UserList({
   showTime,
   teamId,
   refetch,
+  isAdmin = false,
 }: UserListProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const isAdmin =
+  const isUserAdmin =
     teamMembers.find((member) => member.id === userId)?.role === "admin";
   const updateRole = api.teams.updateMemberRole.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Role updated",
+      toast.success("Role updated", {
         description: "The member's role has been updated successfully",
       });
       refetch?.();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: error.message || "Failed to update role",
-        variant: "destructive",
       });
     },
   });
 
   const banUser = api.users.banUser.useMutation({
     onSuccess: () => {
-      toast({
-        title: "User banned",
+      toast.success("User banned", {
         description: "The user has been banned from the team",
       });
       refetch?.();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: error.message || "Failed to ban user",
-        variant: "destructive",
       });
     },
   });
 
   const unbanUser = api.users.unbanUser.useMutation({
     onSuccess: () => {
-      toast({
-        title: "User unbanned",
+      toast.success("User unbanned", {
         description: "The user has been unbanned from the team",
       });
       refetch?.();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: error.message || "Failed to unban user",
-        variant: "destructive",
       });
     },
   });
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
-    toast({
-      title: "Copied",
+    toast.success("Copied", {
       description: "User ID copied to clipboard",
     });
   };
@@ -200,7 +192,9 @@ export function UserList({
           <CardTitle>
             {showTime ? "Checked-in Members" : "Team Members"}
           </CardTitle>
-          <CardDescription>{isAdmin ? "Admin" : "Member"}</CardDescription>
+          <CardDescription>
+            {isUserAdmin || isAdmin ? "Admin" : "Member"}
+          </CardDescription>
           <CardDescription>
             {teamMembers.length}{" "}
             {teamMembers.length === 1 ? "member" : "members"}{" "}
@@ -257,7 +251,7 @@ export function UserList({
                   {getRoleIcon(member.role)}
                   {member.role || "Member"}
                 </Badge>
-                {isAdmin && member.id !== userId && (
+                {(isUserAdmin || isAdmin) && member.id !== userId && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">

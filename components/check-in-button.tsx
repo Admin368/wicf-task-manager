@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, CheckCircle2 } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { api } from "@/lib/trpc/client";
 import { serverGetCheckInsReturnType } from "@/server/api/routers/check-ins";
 interface CheckInButtonProps {
@@ -30,7 +30,6 @@ export function CheckInButton({
 }: CheckInButtonProps) {
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState("");
-  const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
 
   // Get the user's check-in status for today
@@ -61,13 +60,11 @@ export function CheckInButton({
     api.checkIns.checkIn.useMutation({
       onSuccess: (data) => {
         if (data.success) {
-          toast({
-            title: "Checked in successfully",
+          toast.success("Checked in successfully", {
             description: "You've been marked as present for today.",
           });
         } else {
-          toast({
-            title: "Checked in successfully",
+          toast.success("Checked in successfully", {
             description: "You've been marked as present for today.",
           });
         }
@@ -77,10 +74,8 @@ export function CheckInButton({
         window.location.reload();
       },
       onError: (error) => {
-        toast({
-          title: "Check-in failed",
+        toast.error("Check-in failed", {
           description: error.message || "Failed to check in. Please try again.",
-          variant: "destructive",
         });
       },
     });

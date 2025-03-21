@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export interface ResetPasswordEmailProps {
   name: string;
   resetUrl: string;
@@ -5,14 +7,15 @@ export interface ResetPasswordEmailProps {
 
 export function getResetPasswordEmailTemplate(props: ResetPasswordEmailProps) {
   const { name, resetUrl } = props;
+  const appName = env.NEXT_PUBLIC_NAME;
 
   return {
-    subject: "Reset Your Task Manager Password",
+    subject: `Reset Your ${appName} Password`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #333;">Password Reset Request</h1>
         <p>Hi ${name},</p>
-        <p>We received a request to reset your Task Manager password. Click the button below to create a new password:</p>
+        <p>We received a request to reset your ${appName} password. Click the button below to create a new password:</p>
         <div style="margin: 20px 0;">
           <a href="${resetUrl}" style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
             Reset Password

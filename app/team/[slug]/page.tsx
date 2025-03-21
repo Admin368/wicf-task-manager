@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TaskList } from "@/components/task-list";
 import { api } from "@/lib/trpc/client";
-import { Loader2, ExternalLink, Copy, Trash2, Ban } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import {
+  Loader2,
+  ExternalLink,
+  Copy,
+  Trash2,
+  Ban,
+  Settings,
+  Plus,
+} from "lucide-react";
+import { toast } from "sonner";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +34,8 @@ import { UserList } from "@/components/user-list";
 import { useSession } from "next-auth/react";
 import { CheckoutDialog } from "@/components/checkout-dialog";
 import { format } from "date-fns";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/date-picker";
 
 export default function TeamPage() {
   const params = useParams();
@@ -35,19 +45,15 @@ export default function TeamPage() {
   const [activeTab, setActiveTab] = useState("tasks");
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const [showUserList, setShowUserList] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const { data: teamData, isLoading } = api.teams.getBySlug.useQuery(
     { slug },
     {
       enabled: !teamLoaded,
       onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Team not found or you don't have access.",
-          variant: "destructive",
-        });
+        toast.error("Team not found or you don't have access.");
         router.push("/");
       },
     }
@@ -62,11 +68,7 @@ export default function TeamPage() {
       onSuccess: (data) => {
         if (!data.hasAccess) {
           if (data.reason === "banned") {
-            toast({
-              title: "Access Denied",
-              description: "You have been banned from this team.",
-              variant: "destructive",
-            });
+            toast.error("You have been banned from this team.");
           }
           router.push(`/team/${slug}/join`);
         } else {
@@ -98,11 +100,7 @@ export default function TeamPage() {
       // retry: false,
       refetchInterval: 1000 * 60 * 1, // ms * sec * min
       onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to get check-ins. Please refresh the page.",
-          variant: "destructive",
-        });
+        toast.error("Failed to get check-ins. Please refresh the page.");
       },
     }
   );
@@ -115,26 +113,55 @@ export default function TeamPage() {
     (member: any) => member.id === userId
   )?.role;
 
-  const isAdmin = currentUserRole === "admin" || currentUserRole === "owner";
+  // Check if the current user is an admin
+  const isAdmin = currentUserRole === "admin";
 
   const totalMembers = teamMembers?.length || 0;
 
   const deleteTeam = api.teams.delete.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Team deleted",
-        description: "The team has been successfully deleted",
-      });
+      toast.success("Team deleted successfully.");
       router.push("/");
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete team",
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to delete team");
     },
   });
+
+  const handleCopyInviteLink = () => {
+    try {
+      const inviteLink = `${window.location.origin}/team/${slug}/join`;
+      const message = `🌟 Maravian Checklist 🌟\nA collaborative task manager with daily check-ins to keep your team in sync!\n\n👋 Join my team "${team?.name}" on Maravian Checklist!\n\n📎 Team Link: ${inviteLink}\n🔑 Team Password: [Get from team admin]\n\nClick the link and use the password to join our team. Let's collaborate together!`;
+
+      if (navigator && navigator.clipboard) {
+        navigator.clipboard
+          .writeText(message)
+          .then(() => {
+            toast.success("Invite link copied to clipboard");
+          })
+          .catch((err) => {
+            console.error("Failed to copy:", err);
+            toast.error("Failed to copy invite link");
+          });
+      } else {
+        // Fallback for browsers without clipboard API
+        const textarea = document.createElement("textarea");
+        textarea.value = message;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        toast.success("Invite link copied to clipboard");
+      }
+    } catch (error) {
+      console.error("Copy error:", error);
+      toast.error("Failed to copy invite link");
+    }
+  };
 
   if (isLoading || !teamLoaded) {
     return (
@@ -169,16 +196,7 @@ export default function TeamPage() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => {
-              const inviteLink = `${window.location.origin}/team/${slug}/join`;
-              const message = `🌟 Maravian Checklist 🌟\nA collaborative task manager with daily check-ins to keep your team in sync!\n\n👋 Join my team "${team.name}" on Maravian Checklist!\n\n📎 Team Link: ${inviteLink}\n🔑 Team Password: ${team.password}\n\nClick the link and use the password to join our team. Let's collaborate together!`;
-              navigator.clipboard.writeText(message);
-              toast({
-                title: "Invite Message Copied",
-                description:
-                  "Team invite message with password has been copied to your clipboard",
-              });
-            }}
+            onClick={handleCopyInviteLink}
           >
             <Copy className="h-4 w-4 mr-2" />
             Copy Invite Message
@@ -203,62 +221,128 @@ export default function TeamPage() {
           )}
 
           {isAdmin && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Team
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete
-                    the team and remove all associated data including tasks and
-                    check-ins.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteTeam.mutate({ teamId: team.id })}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Delete Team
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="outline"
+              className="w-full"
+              // size="sm"
+              onClick={() => router.push(`/team/${slug}/settings`)}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
           )}
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" className="hidden">
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Team
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action will delete the team and all associated data. This
+                  action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground"
+                  onClick={async () => {
+                    try {
+                      if (!teamData?.team?.id) return;
+                      await deleteTeam.mutateAsync({
+                        teamId: teamData.team.id,
+                      });
+                    } catch (error) {
+                      // Handled in mutation
+                    }
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Main content area */}
         <div className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="tasks">Tasks</TabsTrigger>
-              <TabsTrigger value="checkins">Review</TabsTrigger>
+            <TabsList className="w-full max-w-md mx-auto mb-8">
+              <TabsTrigger
+                value="tasks"
+                onClick={() => setActiveTab("tasks")}
+                className="flex-1"
+              >
+                Tasks
+              </TabsTrigger>
+              <TabsTrigger
+                value="members"
+                onClick={() => setActiveTab("members")}
+                className="flex-1"
+              >
+                Team Members
+              </TabsTrigger>
+              <TabsTrigger
+                value="check-ins"
+                onClick={() => setActiveTab("check-ins")}
+                className="flex-1"
+              >
+                Check-ins
+              </TabsTrigger>
             </TabsList>
-            <TabsContent value="tasks">
-              <TaskList
-                teamId={team.id}
-                teamName={team.name}
+
+            <TabsContent value="tasks" className="space-y-6">
+              <div className="flex flex-col">
+                <div className="flex justify-between items-center">
+                  <DatePicker
+                    date={selectedDate}
+                    onDateChange={setSelectedDate}
+                  />
+                  {/* <div className="flex space-x-2">
+                    <Button
+                      onClick={() => {
+                        setIsAddingTask(true);
+                        setParentTaskId(null);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Task
+                    </Button>
+                  </div> */}
+                </div>
+
+                <div className="mt-4">
+                  <h2 className="text-lg font-semibold mb-4">
+                    Tasks for {format(selectedDate, "MMMM d, yyyy")}
+                  </h2>
+
+                  <TaskList
+                    teamId={team.id}
+                    teamName={team.name}
+                    isAdmin={isAdmin}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="members" className="space-y-6">
+              <UserList
+                teamId={team?.id || ""}
+                teamMembers={teamMembers || []}
                 isAdmin={isAdmin}
               />
             </TabsContent>
-            <TabsContent value="checkins">
-              <CheckInsPage />
+
+            <TabsContent value="check-ins" className="space-y-6">
+              <CheckInsPage
+              // teamId={teamData?.team?.id}
+              />
             </TabsContent>
           </Tabs>
-
-          {showUserList && team.id && teamMembers && (
-            <UserList
-              teamMembers={teamMembers || []}
-              onClose={() => setShowUserList(false)}
-              teamId={team?.id}
-            />
-          )}
         </div>
       </div>
     </div>

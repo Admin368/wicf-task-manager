@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Plus, Users, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Users,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  ArrowUpDown,
+} from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { DatePicker } from "./date-picker";
 import { TaskItem } from "./task-item";
@@ -13,6 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Task } from "@prisma/client";
+import { cn } from "@/lib/utils";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 interface TeamMember {
   id: string;
@@ -37,8 +46,9 @@ export function TaskList({
   const [showUserList, setShowUserList] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hideTools, setHideTools] = useState(true);
+  const [hideTools, setHideTools] = useState(false);
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
+  const [showReorderButtons, setShowReorderButtons] = useState(false);
   // const today = format(new Date(), "yyyy-MM-dd");
 
   // const formattedDate = selectedDate.toISOString().split("T")[0];
@@ -276,8 +286,8 @@ export function TaskList({
   return (
     <div className="flex-1 overflow-hidden">
       <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{teamName}</h1>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+          <h1 className="text-xl md:text-2xl font-bold">{teamName}</h1>
           <div className="text-sm text-muted-foreground">
             Logged in as: {userName}
           </div>
@@ -332,12 +342,12 @@ export function TaskList({
         )}
 
         <div className="border rounded-md flex flex-col">
-          <div className="p-4 border-b bg-muted/50">
-            <h2 className="font-semibold">
+          <div className="p-2 md:p-4 border-b bg-muted/50">
+            <h2 className="font-semibold text-sm md:text-base">
               Tasks for {format(selectedDate, "MMMM d, yyyy")}
             </h2>
           </div>
-          <div className="p-4 border-b bg-muted/50 flex gap-2 flex flex-wrap">
+          <div className="p-2 md:p-4 border-b bg-muted/50 flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -345,6 +355,7 @@ export function TaskList({
               onClick={() => {
                 setHideTools(!hideTools);
               }}
+              className="text-xs md:text-sm py-1 px-2 h-auto"
             >
               {hideTools ? "Show Task Tools" : "Hide Task Tools"}
             </Button>
@@ -352,22 +363,38 @@ export function TaskList({
               variant="outline"
               size="sm"
               onClick={() => setShowAssignedToMe(!showAssignedToMe)}
+              className="text-xs md:text-sm py-1 px-2 h-auto"
             >
-              {showAssignedToMe ? "Show All Tasks" : "Show Only Assigned to Me"}
+              {showAssignedToMe ? "Show All Tasks" : "Show Only Mine"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                refetch?.();
-              }}
-              disabled={isLoading || isRefetching}
-            >
-              {isLoading || isRefetching ? "Refreshing..." : "Refresh"}
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isRefetching}
+                className="text-xs md:text-sm py-1 px-2 h-auto"
+              >
+                <RefreshCw
+                  className={cn("h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2", {
+                    "animate-spin": isRefetching,
+                  })}
+                />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowReorderButtons(!showReorderButtons)}
+                className="text-xs md:text-sm py-1 px-2 h-auto"
+              >
+                <ArrowUpDown className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
+                {showReorderButtons ? "Hide Reorder" : "Reorder"}
+              </Button>
+            </div>
           </div>
           {!checkInStatus?.checkedIn && (
-            <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground">
+            <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground text-xs md:text-sm">
               You must be checked in to complete tasks
             </div>
           )}
@@ -382,15 +409,15 @@ export function TaskList({
                 ))}
               </div>
             ) : tasksError ? (
-              <div className="text-center py-8 text-destructive">
+              <div className="text-center py-8 text-destructive text-sm">
                 <p>Failed to load tasks. Please try refreshing the page.</p>
               </div>
             ) : tasks?.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground text-sm">
                 <p>No tasks found. Add your first task to get started.</p>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 overflow-y-auto p-2 md:p-4">
                 {error && (
                   <div className="mb-4 text-sm text-red-500">{error}</div>
                 )}
@@ -418,6 +445,7 @@ export function TaskList({
                         hideTools={hideTools}
                         hideNotAssignedToMe={showAssignedToMe}
                         isCheckedIn={checkInStatus?.checkedIn ?? false}
+                        showReorderButtons={showReorderButtons}
                       />
                     ))}
                   </div>
