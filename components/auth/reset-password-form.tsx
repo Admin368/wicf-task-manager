@@ -40,10 +40,12 @@ export function ResetPasswordForm({
     resolver: zodResolver(formSchema),
   });
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const router = useRouter();
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
+    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/auth/reset-password", {
@@ -57,8 +59,17 @@ export function ResetPasswordForm({
         }),
       });
 
+      const responseText = await response.text();
+
       if (!response.ok) {
-        throw new Error("Failed to reset password");
+        if (responseText === "Invalid or expired reset token") {
+          setErrorMessage(
+            "Invalid or expired reset token. Please request a new password reset link."
+          );
+          throw new Error(responseText);
+        } else {
+          throw new Error("Failed to reset password");
+        }
       }
 
       toast.success(
@@ -66,7 +77,11 @@ export function ResetPasswordForm({
       );
       router.push("/login");
     } catch (error) {
-      toast.error("Something went wrong. Please try again.");
+      if (!errorMessage) {
+        toast.error("Something went wrong. Please try again.");
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -76,6 +91,11 @@ export function ResetPasswordForm({
     <div className={className} {...props}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="grid gap-4">
+          {errorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
+              {errorMessage}
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="password">New Password</Label>
             <Input
