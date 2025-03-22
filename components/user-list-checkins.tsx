@@ -238,7 +238,7 @@ export function UserListCheckIns({
                     {showTime && checkIn.checkedInAt && (
                       <div className="text-xs text-muted-foreground flex items-center whitespace-nowrap flex-shrink-0">
                         <Clock className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">Checked in at </span>
+                        <span className="hidden sm:inline">{`Checked in at `}</span>
                         <span>
                           {format(new Date(checkIn.checkedInAt), "h:mm a")}
                         </span>

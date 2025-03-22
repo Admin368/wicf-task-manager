@@ -37,6 +37,7 @@ import {
   serverGetTasksReturnType,
 } from "@/server/api/routers/tasks";
 // import { Task } from "@prisma/client";
+import { TaskCompletionTime } from "./task-completion-time";
 
 interface TaskItemProps {
   task: serverGetTasksReturnType;

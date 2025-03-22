@@ -204,13 +204,11 @@ export default function TeamPage() {
             Copy Invite Message
           </Button>
 
-          {team.isCloneable && (
-            <CloneTeamButton
-              teamId={team.id}
-              teamName={team.name}
-              isCloneable={team.isCloneable}
-            />
-          )}
+          <CloneTeamButton
+            teamId={team.id}
+            teamName={team.name}
+            isCloneable={team.isCloneable}
+          />
 
           <Button
             variant="outline"
