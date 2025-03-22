@@ -211,8 +211,45 @@ export function ChecklistComponent({
   };
 
   const handleMoveTask = async (taskId: string, direction: "up" | "down") => {
-    // Implementation for reordering tasks
-    // Similar to the TaskList component
+    if (!isAdmin) return;
+    
+    try {
+      setError(null);
+      const taskToMove = tasks.find(t => t.id === taskId);
+      if (!taskToMove) return;
+      
+      const siblings = tasks
+        .filter(t => t.parentId === taskToMove.parentId)
+        .sort((a, b) => a.position - b.position);
+      
+      const currentIndex = siblings.findIndex(t => t.id === taskId);
+      if (currentIndex === -1) return;
+      
+      const targetIndex = direction === "up" 
+        ? Math.max(0, currentIndex - 1) 
+        : Math.min(siblings.length - 1, currentIndex + 1);
+      
+      if (currentIndex === targetIndex) return;
+      
+      const targetTask = siblings[targetIndex];
+      
+      await updateTask.mutateAsync({
+        id: taskId,
+        position: targetTask.position,
+        teamId
+      });
+      
+      await updateTask.mutateAsync({
+        id: targetTask.id,
+        position: taskToMove.position,
+        teamId
+      });
+      
+      await refetch?.();
+    } catch (error) {
+      console.error("Failed to move task:", error);
+      setError("Failed to reorder tasks. Please try again.");
+    }
   };
 
   if (isLoading) {
