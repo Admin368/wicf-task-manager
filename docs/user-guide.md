@@ -1,5 +1,11 @@
 # Maravian CheckList User Guide
 
+## Video Guide
+
+For a visual walkthrough of the Maravian CheckList features and functionality, here is the video guide (If the video above doesn't work):
+
+[Video Guide on YouTube https://youtu.be/XfK4g0Z7utw](https://youtu.be/XfK4g0Z7utw)
+
 ## Features
 
 - Team-based task management with password protection
