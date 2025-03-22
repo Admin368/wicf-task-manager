@@ -258,7 +258,7 @@ export function TeamsList() {
           <div className="text-center p-8 border rounded-lg bg-muted/50">
             <h3 className="text-lg font-medium mb-2">No Joined Checklists</h3>
             <p className="text-muted-foreground mb-4">
-              {`You haven't joined any teams yet. Search for teams to join or create your own.`}
+              {`You haven't joined any checklists yet. Search for checklists to join or create your own.`}
             </p>
             <Button onClick={handleGoToCreateTeam}>
               <Plus className="mr-2 h-4 w-4" />
