@@ -375,6 +375,7 @@ export function ChecklistComponent({
           }}
           tasks={tasks as any}
           teamId={teamId}
+          teamName={teamName}
         />
       )}
 
